@@ -26,7 +26,7 @@ function uid() {
 function normalizeUrl(input) {
   try {
     const tentative = input.trim();
-    const withProto = /^(https?:)?\\/\\//i.test(tentative) ? tentative : `https://${tentative}`;
+    const withProto = /^(https?:)?\/\//i.test(tentative) ? tentative : `https://${tentative}`;
     const u = new URL(withProto);
     return u.toString();
   } catch {
@@ -218,9 +218,7 @@ export default function CooldownApp() {
               notifiedRef.current.add(key);
               notifyReady(it);
               beep();
-              // escaping quotes for template strings in raw literal
-              const label = it.label || hostnameFromUrl(it.url);
-              // No need to escape more; building string normally
+              push(`\"${it.label || hostnameFromUrl(it.url)}\" ya se puede visitar.`);
             }
             changed = true;
             return { ...it, endAt: null, updatedAt: now };
@@ -232,7 +230,7 @@ export default function CooldownApp() {
       });
     }, 1000);
     return () => clearInterval(t);
-  }, [beep]);
+  }, [push, beep]);
 
   useEffect(() => saveSettings(settings), [settings]);
 
@@ -288,6 +286,7 @@ export default function CooldownApp() {
       saveState(next);
       return next;
     });
+    if (!fromOpen) push("Cooldown iniciado");
   };
 
   const resetCooldown = (id) => {
@@ -297,6 +296,7 @@ export default function CooldownApp() {
       saveState(next);
       return next;
     });
+    push("Reiniciado");
   };
 
   const clearCooldown = (id) => {
@@ -306,6 +306,7 @@ export default function CooldownApp() {
       saveState(next);
       return next;
     });
+    push("Limpio");
   };
 
   const exportData = () => {
@@ -325,12 +326,17 @@ export default function CooldownApp() {
       if (parsed.settings) {
         setSettings({ ...DEFAULT_SETTINGS, ...parsed.settings });
       }
-    } catch {}
+      push("Datos importados");
+    } catch {
+      push("Archivo inválido");
+    }
   };
 
   const requestNotifications = async () => {
     const res = await ensurePermission();
-    if (res !== "granted") return;
+    setPermission(res);
+    if (res === "granted") push("Notificaciones activadas");
+    else push("Permiso denegado");
   };
 
   return (
@@ -354,13 +360,21 @@ export default function CooldownApp() {
                 <button
                   key={f.k}
                   onClick={() => setFilter(f.k)}
-                  className={`px-3 py-1.5 rounded-lg text-sm ${filter === f.k ? "bg-white shadow border" : "text-slate-600"}`}
+                  className={`px-3 py-1.5 rounded-lg text-sm ${
+                    filter === f.k ? "bg-white shadow border" : "text-slate-600"
+                  }`}
                 >
                   {f.label}
                 </button>
               ))}
             </div>
-            { (typeof Notification !== 'undefined') && Notification.permission !== "granted" && (
+            <button
+              onClick={() => setShowForm(true)}
+              className="px-3 py-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800"
+            >
+              Añadir sitio
+            </button>
+            {notifSupported && permission !== "granted" && (
               <button
                 onClick={requestNotifications}
                 className="px-3 py-2 rounded-xl border border-slate-300 hover:bg-slate-100"
@@ -373,28 +387,70 @@ export default function CooldownApp() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-6">
-        <SettingsPanel settings={settings} setSettings={setSettings} onExport={exportData} onImport={() => {}} />
+        <SettingsPanel settings={settings} setSettings={setSettings} onExport={exportData} onImport={importData} />
 
         {shown.length === 0 ? (
-          <EmptyState onAdd={() => {}} />
+          <EmptyState onAdd={() => setShowForm(true)} />
         ) : (
           <ul className="grid md:grid-cols-2 gap-4" aria-live="polite">
             {shown.map((it) => (
               <li key={it.id} className="">
                 <SiteCard
                   item={it}
-                  onEdit={() => {}}
-                  onDelete={() => {}}
-                  onStart={() => {}}
-                  onReset={() => {}}
-                  onClear={() => {}}
-                  onOpen={() => {}}
+                  onEdit={() => {
+                    setEditing(it);
+                    setShowForm(true);
+                  }}
+                  onDelete={() => {
+                    if (confirm("¿Eliminar este sitio?")) removeItem(it.id);
+                  }}
+                  onStart={() => startCooldown(it.id)}
+                  onReset={() => resetCooldown(it.id)}
+                  onClear={() => clearCooldown(it.id)}
+                  onOpen={() => {
+                    window.open(it.url, "_blank", "noopener,noreferrer");
+                    startCooldown(it.id, true);
+                  }}
                 />
               </li>
             ))}
           </ul>
         )}
       </main>
+
+      {showForm && (
+        <AddEditModal
+          initial={editing}
+          defaultDurationMs={settings.defaultDurationMs}
+          onClose={() => {
+            setShowForm(false);
+            setEditing(null);
+          }}
+          onSave={(payload, options) => {
+            const existing = editing;
+            if (existing && existing.endAt && payload.durationMs !== existing.durationMs) {
+              const applyNow = confirm(
+                "Has cambiado la duración. Aceptar = aplicar ahora. Cancelar = aplicar en la próxima visita."
+              );
+              if (applyNow) {
+                payload.endAt = existing.lastVisitedAt ? existing.lastVisitedAt + payload.durationMs : null;
+              }
+            }
+            upsertItem(payload);
+            setShowForm(false);
+            setEditing(null);
+          }}
+        />
+      )}
+
+      {/* Toasts */}
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 space-y-2 z-50">
+        {toasts.map((t) => (
+          <div key={t.id} className="px-4 py-2 bg-slate-900 text-white rounded-xl shadow">
+            {t.msg}
+          </div>
+        ))}
+      </div>
 
       <footer className="py-10 text-center text-xs text-slate-500">
         Nota: Las notificaciones mientras la pestaña esté cerrada pueden no llegar sin reabrir la app.
@@ -410,7 +466,7 @@ function EmptyState({ onAdd }) {
       <div className="text-5xl">⏳</div>
       <h2 className="text-xl font-semibold">Aún no hay sitios</h2>
       <p className="text-slate-600 max-w-sm">
-        Añade webs que sueles visitar para crear un "cooldown" personalizado y evitar volver demasiado pronto.
+        Añade webs que sueles visitar para crear un \"cooldown\" personalizado y evitar volver demasiado pronto.
       </p>
       <button onClick={onAdd} className="mt-2 px-4 py-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800">
         Añadir primer sitio
@@ -423,7 +479,7 @@ function SiteCard({ item, onEdit, onDelete, onStart, onReset, onClear, onOpen })
   const ready = !item.endAt;
   const host = hostnameFromUrl(item.url);
   const status = ready ? "Listo" : hhmmss(Math.max(0, item.endAt - Date.now()));
-  const progress = React.useMemo(() => {
+  const progress = useMemo(() => {
     if (!item.endAt || !item.lastVisitedAt) return 0;
     const total = item.durationMs;
     const elapsed = Math.min(total, Math.max(0, Date.now() - item.lastVisitedAt));
@@ -469,6 +525,7 @@ function SiteCard({ item, onEdit, onDelete, onStart, onReset, onClear, onOpen })
 }
 
 function SettingsPanel({ settings, setSettings, onExport, onImport }) {
+  const [file, setFile] = useState(null);
   return (
     <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-4">
       <h2 className="font-semibold mb-2">Ajustes</h2>
@@ -525,6 +582,103 @@ function DurationInput({ minutes, onChangeMinutes }) {
             {m >= 60 ? `${m / 60}h` : `${m}m`}
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function AddEditModal({ initial, defaultDurationMs, onClose, onSave }) {
+  const [url, setUrl] = useState(initial?.url || "");
+  const [label, setLabel] = useState(initial?.label || "");
+  const [scope, setScope] = useState(initial?.scope || "domain");
+  const [minutes, setMinutes] = useState(Math.max(1, Math.round((initial?.durationMs || defaultDurationMs) / 60000)));
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    // Autofill label from hostname
+    const normalized = normalizeUrl(url);
+    if (!label && normalized) setLabel(hostnameFromUrl(normalized));
+  }, [url]);
+
+  const save = () => {
+    setError("");
+    const normalized = normalizeUrl(url);
+    if (!normalized) {
+      setError("URL inválida");
+      return;
+    }
+    const origin = originFromUrl(normalized);
+    const host = hostnameFromUrl(normalized);
+    const favicon = origin ? `${origin}/favicon.ico` : null;
+
+    const payload = {
+      id: initial?.id || uid(),
+      url: normalized,
+      label: label || host,
+      scope,
+      durationMs: Math.max(60000, minutes * 60000),
+      endAt: initial?.endAt || null,
+      lastVisitedAt: initial?.lastVisitedAt || null,
+      createdAt: initial?.createdAt || Date.now(),
+      updatedAt: Date.now(),
+      favicon,
+    };
+    onSave(payload);
+  };
+
+  return (
+    <div className="fixed inset-0 z-40 bg-black/30 grid place-items-center p-4" role="dialog" aria-modal="true">
+      <div className="w-full max-w-lg rounded-2xl bg-white p-4 shadow-xl">
+        <div className="flex items-center gap-2 mb-2">
+          <h3 className="text-lg font-semibold">{initial ? "Editar sitio" : "Añadir sitio"}</h3>
+          <button onClick={onClose} className="ml-auto px-3 py-1.5 rounded-lg border hover:bg-slate-50">Cerrar</button>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm text-slate-600 mb-1">URL</label>
+            <input
+              className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400"
+              placeholder="https://ejemplo.com"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+            />
+            {error && <div className="text-rose-600 text-sm mt-1">{error}</div>}
+          </div>
+          <div>
+            <label className="block text-sm text-slate-600 mb-1">Nombre</label>
+            <input
+              className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400"
+              placeholder="Etiqueta opcional"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm text-slate-600 mb-1">Ámbito</label>
+              <div className="flex gap-2">
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="radio" name="scope" checked={scope === "domain"} onChange={() => setScope("domain")} />
+                  Dominio (ej. ejemplo.com)
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="radio" name="scope" checked={scope === "url"} onChange={() => setScope("url")} />
+                  URL completa
+                </label>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm text-slate-600 mb-1">Duración (minutos)</label>
+              <DurationInput minutes={minutes} onChangeMinutes={setMinutes} />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button onClick={onClose} className="px-3 py-2 rounded-xl border hover:bg-slate-50">Cancelar</button>
+            <button onClick={save} className="px-3 py-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800">
+              {initial ? "Guardar cambios" : "Añadir"}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
