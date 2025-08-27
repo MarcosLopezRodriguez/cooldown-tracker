@@ -22,3 +22,6 @@ npm run preview
 - El estilo usa Tailwind vía CDN en `index.html` para simplificar.
 - Las notificaciones con la pestaña completamente cerrada requieren backend con Web Push. En esta versión se muestran si la app está abierta (o al volver a abrir).
 
+## Créditos y Apoyo al desarrollo
+
+Si esta aplicación te ha ayudado, considera apoyar al desarrollo de esta y otras aplicaciones: https://ko-fi.com/markonichan
