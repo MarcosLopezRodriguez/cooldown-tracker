@@ -1,19 +1,16 @@
 import { useCallback, useState } from "react";
+import { uid } from "../lib/utils.js";
 
-import { uid } from "../lib/sites";
-
-function useToasts() {
+export function useToasts() {
   const [toasts, setToasts] = useState([]);
 
-  const push = useCallback((msg) => {
+  const push = useCallback((message, tone = "info") => {
     const id = uid();
-    setToasts((current) => [...current, { id, msg }]);
-    setTimeout(() => {
-      setToasts((current) => current.filter((toast) => toast.id !== id));
+    setToasts((currentToasts) => [...currentToasts, { id, message, tone }]);
+    window.setTimeout(() => {
+      setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== id));
     }, 4000);
   }, []);
 
-  return { push, toasts };
+  return { toasts, push };
 }
-
-export { useToasts };

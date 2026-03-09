@@ -1,38 +1,47 @@
-import { DEFAULT_SETTINGS, normalizeSettings, normalizeSites } from "./sites";
+import { DEFAULT_SETTINGS, LS_KEY, LS_SETTINGS_KEY } from "./constants.js";
+import { normalizeSettings, normalizeSites } from "./sites.js";
 
-const LS_KEY = "cooldown_site_timers_v1";
-const LS_SETTINGS_KEY = "cooldown_settings_v1";
+function readJson(key, fallback) {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return fallback;
+  }
 
-function loadState() {
   try {
-    const raw = localStorage.getItem(LS_KEY);
-    const items = raw ? JSON.parse(raw) : [];
-    return normalizeSites(items);
+    const rawValue = window.localStorage.getItem(key);
+    return rawValue ? JSON.parse(rawValue) : fallback;
   } catch {
-    return [];
+    return fallback;
   }
 }
 
-function saveState(items) {
-  try {
-    localStorage.setItem(LS_KEY, JSON.stringify(normalizeSites(items)));
-  } catch {}
+export function loadStoredItems(now = Date.now()) {
+  return normalizeSites(readJson(LS_KEY, []), { now });
 }
 
-function loadSettings() {
+export function saveStoredItems(items) {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return;
+  }
+
   try {
-    const raw = localStorage.getItem(LS_SETTINGS_KEY);
-    const settings = raw ? JSON.parse(raw) : DEFAULT_SETTINGS;
-    return normalizeSettings(settings);
+    window.localStorage.setItem(LS_KEY, JSON.stringify(items));
   } catch {
-    return normalizeSettings(DEFAULT_SETTINGS);
+    // Ignore persistence failures.
   }
 }
 
-function saveSettings(settings) {
-  try {
-    localStorage.setItem(LS_SETTINGS_KEY, JSON.stringify(normalizeSettings(settings)));
-  } catch {}
+export function loadStoredSettings() {
+  return normalizeSettings(readJson(LS_SETTINGS_KEY, DEFAULT_SETTINGS));
 }
 
-export { loadSettings, loadState, saveSettings, saveState };
+export function saveStoredSettings(settings) {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(LS_SETTINGS_KEY, JSON.stringify(normalizeSettings(settings)));
+  } catch {
+    // Ignore persistence failures.
+  }
+}

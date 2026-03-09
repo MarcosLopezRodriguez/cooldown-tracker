@@ -1,15 +1,23 @@
 import { useCallback, useRef, useState } from "react";
-
-import { hostnameFromUrl, normalizeSettings } from "../lib/sites";
+import { buildFaviconUrl, hostnameFromUrl } from "../lib/utils.js";
 
 function canNotify() {
   return typeof window !== "undefined" && "Notification" in window;
 }
 
 async function ensurePermission() {
-  if (!canNotify()) return "denied";
-  if (Notification.permission === "granted") return "granted";
-  if (Notification.permission === "denied") return "denied";
+  if (!canNotify()) {
+    return "denied";
+  }
+
+  if (Notification.permission === "granted") {
+    return "granted";
+  }
+
+  if (Notification.permission === "denied") {
+    return "denied";
+  }
+
   try {
     return await Notification.requestPermission();
   } catch {
@@ -17,81 +25,90 @@ async function ensurePermission() {
   }
 }
 
-function useNotificationCenter({ notificationsOn, soundOn, setSettings, push }) {
+function showBrowserNotification(item) {
+  if (!canNotify() || Notification.permission !== "granted") {
+    return;
+  }
+
+  const notification = new Notification(`Listo para visitar: ${item.label || hostnameFromUrl(item.url)}`, {
+    body: "El cooldown ha terminado.",
+    icon: item.favicon || buildFaviconUrl(item.url),
+    tag: `cooldown-${item.id}-${Date.now()}`,
+  });
+
+  window.setTimeout(() => {
+    notification.close();
+  }, 5000);
+}
+
+export function useNotificationCenter({ notificationsOn, soundOn, push }) {
+  const supported = canNotify();
+  const [permission, setPermission] = useState(() => (supported ? Notification.permission : "denied"));
   const audioContextRef = useRef(null);
-  const [notifSupported] = useState(() => canNotify());
-  const [permission, setPermission] = useState(() => (
-    notifSupported ? Notification.permission : "denied"
-  ));
 
-  const beep = useCallback(() => {
-    if (!soundOn) return;
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (!AudioCtx) return;
+  const playBeep = useCallback(() => {
+    if (!soundOn || typeof window === "undefined") {
+      return;
+    }
 
-    audioContextRef.current = audioContextRef.current || new AudioCtx();
-    const ctx = audioContextRef.current;
-    const oscillator = ctx.createOscillator();
-    const gain = ctx.createGain();
+    const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextCtor) {
+      return;
+    }
+
+    audioContextRef.current = audioContextRef.current || new AudioContextCtor();
+    const context = audioContextRef.current;
+    const oscillator = context.createOscillator();
+    const gainNode = context.createGain();
 
     oscillator.type = "sine";
     oscillator.frequency.value = 880;
-    gain.gain.value = 0.05;
-    oscillator.connect(gain).connect(ctx.destination);
+    gainNode.gain.value = 0.05;
+
+    oscillator.connect(gainNode).connect(context.destination);
     oscillator.start();
-    setTimeout(() => oscillator.stop(), 180);
+    window.setTimeout(() => {
+      oscillator.stop();
+    }, 180);
   }, [soundOn]);
 
-  const notifyReady = useCallback((item) => {
-    if (!notifSupported || permission !== "granted" || !notificationsOn) return;
-    const icon = item.favicon || "/favicon.ico";
-    const notification = new Notification(
-      `Listo para visitar: ${item.label || hostnameFromUrl(item.url)}`,
-      {
-        body: "El cooldown ha terminado.",
-        icon,
-        tag: `cooldown-${item.id}-${Date.now()}`,
-      },
-    );
-    setTimeout(() => notification.close(), 5000);
-  }, [notifSupported, notificationsOn, permission]);
-
-  const notifyItemReady = useCallback((item) => {
-    notifyReady(item);
-    beep();
-    push(`"${item.label || hostnameFromUrl(item.url)}" ya se puede visitar.`);
-  }, [beep, notifyReady, push]);
-
-  const requestNotifications = useCallback(async () => {
-    const result = await ensurePermission();
-    setPermission(result);
-    const enabled = result === "granted";
-    setSettings((prev) => normalizeSettings({ ...prev, notificationsOn: enabled }));
-    push(enabled ? "Notificaciones activadas" : "Permiso denegado");
-    return enabled;
-  }, [push, setSettings]);
+  const notifyReady = useCallback(
+    (item) => {
+      if (notificationsOn && permission === "granted") {
+        showBrowserNotification(item);
+      }
+      playBeep();
+    },
+    [notificationsOn, permission, playBeep],
+  );
 
   const toggleNotifications = useCallback(async () => {
+    if (!supported) {
+      push("Este navegador no soporta notificaciones.", "error");
+      return false;
+    }
+
     if (notificationsOn) {
-      setSettings((prev) => normalizeSettings({ ...prev, notificationsOn: false }));
-      push("Notificaciones desactivadas");
+      push("Notificaciones desactivadas.", "success");
       return false;
     }
 
-    if (!notifSupported) {
-      push("Este navegador no soporta notificaciones.");
-      return false;
+    const nextPermission = await ensurePermission();
+    setPermission(nextPermission);
+
+    if (nextPermission === "granted") {
+      push("Notificaciones activadas.", "success");
+      return true;
     }
 
-    return requestNotifications();
-  }, [notifSupported, notificationsOn, push, requestNotifications, setSettings]);
+    push("Permiso de notificaciones denegado.", "error");
+    return false;
+  }, [notificationsOn, push, supported]);
 
   return {
-    notifSupported,
-    notifyItemReady,
+    supported,
     permission,
     toggleNotifications,
+    notifyReady,
   };
 }
-
-export { useNotificationCenter };

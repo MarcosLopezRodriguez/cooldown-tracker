@@ -5,7 +5,7 @@ import reactRefresh from "eslint-plugin-react-refresh";
 
 export default [
   {
-    ignores: ["dist/**", "node_modules/**", ".idea/**"],
+    ignores: ["dist/**", "coverage/**", "node_modules/**"],
   },
   js.configs.recommended,
   {
@@ -20,7 +20,6 @@ export default [
       },
       globals: {
         ...globals.browser,
-        ...globals.node,
       },
     },
     plugins: {
@@ -30,7 +29,6 @@ export default [
     rules: {
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
-      "no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
     },
   },
 ];

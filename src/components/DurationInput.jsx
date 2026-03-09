@@ -1,52 +1,50 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { DURATION_PRESETS } from "../lib/constants.js";
+import { clampMinutes, formatMinutesLabel } from "../lib/utils.js";
 
-function DurationInput({ minutes, onChangeMinutes }) {
-  const presets = [5, 10, 15, 30, 60];
+export default function DurationInput({ minutes, onChangeMinutes, inputId = "duration" }) {
   const [value, setValue] = useState(String(minutes || 15));
 
   useEffect(() => {
     setValue(String(minutes || 15));
   }, [minutes]);
 
-  const formatTime = (minutesValue) => {
-    if (minutesValue < 60) return `${minutesValue}m`;
-    const hours = minutesValue / 60;
-    return `${hours} ${hours === 1 ? "hora" : "horas"}`;
-  };
-
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2">
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
         <input
+          id={inputId}
           type="number"
           min={1}
-          className="w-24 px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400"
+          className="w-28 rounded-2xl border border-slate-300 px-3 py-2.5 text-sm shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
           value={value}
           onChange={(event) => setValue(event.target.value)}
           onBlur={() => {
-            const next = Math.max(1, parseInt(value || "0", 10));
-            onChangeMinutes(next);
+            onChangeMinutes(clampMinutes(value, minutes || 1));
           }}
         />
         <span className="text-sm text-slate-600">minutos</span>
       </div>
+
       <div className="flex flex-wrap gap-2">
-        {presets.map((preset) => (
-          <button
-            key={preset}
-            onClick={() => onChangeMinutes(preset)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              minutes === preset
-                ? "bg-blue-100 text-blue-700 border border-blue-200"
-                : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-            }`}
-          >
-            {formatTime(preset)}
-          </button>
-        ))}
+        {DURATION_PRESETS.map((preset) => {
+          const selected = minutes === preset;
+          return (
+            <button
+              key={preset}
+              type="button"
+              onClick={() => onChangeMinutes(preset)}
+              className={`rounded-xl px-3 py-1.5 text-sm font-medium transition ${
+                selected
+                  ? "border border-blue-200 bg-blue-100 text-blue-700"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              {formatMinutesLabel(preset)}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 }
-
-export { DurationInput };
