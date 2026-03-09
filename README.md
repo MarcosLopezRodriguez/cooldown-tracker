@@ -1,24 +1,29 @@
 # Cooldown Tracker
 
-Aplicación React para gestionar *cooldowns* por sitio web y recibir avisos cuando se pueda volver a visitar.
+Aplicacion React para gestionar *cooldowns* por sitio web y recibir avisos cuando se pueda volver a visitar.
 
 ## Requisitos
 - Node.js 18+ y npm
 
-## Uso rápido
+## Uso rapido
 ```bash
 npm install
 npm run dev
 ```
 Abre el enlace que imprime Vite (normalmente http://localhost:5173).
 
-### Build de producción
+### Checks
+```bash
+npm run lint
+npm run test:run
+```
+
+### Build de produccion
 ```bash
 npm run build
 npm run preview
 ```
 
 ## Notas
-- El estilo usa Tailwind vía CDN en `index.html` para simplificar.
-- Las notificaciones con la pestaña completamente cerrada requieren backend con Web Push. En esta versión se muestran si la app está abierta (o al volver a abrir).
-
+- El estilo usa Tailwind via CDN en `index.html` para simplificar.
+- Las notificaciones con la pestana completamente cerrada requieren backend con Web Push. En esta version se muestran si la app esta abierta (o al volver a abrir).
