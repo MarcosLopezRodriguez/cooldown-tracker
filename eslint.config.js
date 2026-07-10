@@ -41,7 +41,7 @@ export default [
     },
   },
   {
-    files: ["public/**/*.js"],
+    files: ["extension/**/*.js"],
     languageOptions: {
       globals: {
         chrome: "readonly",

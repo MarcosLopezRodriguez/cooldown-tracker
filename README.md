@@ -37,6 +37,8 @@ npm run build:extension
 
 Después, en Chrome abre `chrome://extensions`, activa el modo de desarrollador y selecciona **Cargar descomprimida**. Elige la carpeta `dist` generada por el build.
 
+No cargues la carpeta `public` ni la raíz del proyecto como extensión: esas carpetas no contienen la aplicación empaquetada. Si Chrome muestra `ERR_FILE_NOT_FOUND` al pulsar el icono de la barra, elimina esa carga anterior y vuelve a cargar `dist`.
+
 La extensión solicita acceso a páginas `http` y `https` para poder detectar y redirigir una navegación cuando exista un cooldown activo. Los datos se almacenan localmente en Chrome mediante `chrome.storage`.
 
 Al abrir un sitio desde la extensión, esa visita queda permitida y reinicia su cooldown. A partir de ahí:
@@ -67,5 +69,5 @@ npm run lint
 - [src/App.jsx](C:/Users/Marcos/Documents/Proyectos/cooldown-tracker/src/App.jsx): estado y flujos principales.
 - [src/lib/sites.js](C:/Users/Marcos/Documents/Proyectos/cooldown-tracker/src/lib/sites.js): normalización, importación y reglas de cooldown.
 - [src/lib/storage.js](C:/Users/Marcos/Documents/Proyectos/cooldown-tracker/src/lib/storage.js): persistencia web y persistencia de extensión.
-- [public/background.js](C:/Users/Marcos/Documents/Proyectos/cooldown-tracker/public/background.js): alarmas, navegación y avisos de Chrome.
-- [public/blocked.html](C:/Users/Marcos/Documents/Proyectos/cooldown-tracker/public/blocked.html): página que se muestra durante un bloqueo activo.
+- [extension/background.js](C:/Users/Marcos/Documents/Proyectos/cooldown-tracker/extension/background.js): alarmas, navegación y avisos de Chrome.
+- [extension/blocked.html](C:/Users/Marcos/Documents/Proyectos/cooldown-tracker/extension/blocked.html): página que se muestra durante un bloqueo activo.
