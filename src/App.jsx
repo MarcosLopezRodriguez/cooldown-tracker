@@ -17,27 +17,17 @@ import {
   startCooldown,
   upsertSite,
 } from "./lib/sites.js";
-import {
-  loadExtensionState,
-  loadStoredItems,
-  loadStoredSettings,
-  saveStoredItems,
-  saveStoredSettings,
-  subscribeToExtensionState,
-  usesExtensionStorage,
-} from "./lib/storage.js";
-import { downloadJsonFile, formatClock, hostnameFromUrl, isExtensionContext } from "./lib/utils.js";
+import { loadStoredItems, loadStoredSettings, saveStoredItems, saveStoredSettings, subscribeToStoredState } from "./lib/storage.js";
+import { downloadJsonFile, formatClock, hostnameFromUrl } from "./lib/utils.js";
 import { useNotificationCenter } from "./hooks/useNotificationCenter.js";
 import { useToasts } from "./hooks/useToasts.js";
 
 export default function CooldownApp() {
   const initialNowRef = useRef(Date.now());
   const initialNow = initialNowRef.current;
-  const extensionMode = isExtensionContext();
   const [now, setNow] = useState(initialNow);
   const [items, setItems] = useState(() => loadStoredItems(initialNow));
   const [settings, setSettings] = useState(() => loadStoredSettings());
-  const [storageReady, setStorageReady] = useState(() => !usesExtensionStorage());
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -46,79 +36,24 @@ export default function CooldownApp() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [durationDecision, setDurationDecision] = useState(null);
   const { toasts, push } = useToasts();
-  const { supported, permission, toggleNotifications, notifyReady } = useNotificationCenter({
+  const { supported, permission, toggleNotifications, notifyReady, primeAudio } = useNotificationCenter({
     notificationsOn: settings.notificationsOn,
     soundOn: settings.soundOn,
     push,
   });
   const notifiedRef = useRef(new Set());
-  const itemsRef = useRef(items);
-  const settingsRef = useRef(settings);
   const persistenceWarningShownRef = useRef(false);
 
   useEffect(() => {
-    itemsRef.current = items;
-  }, [items]);
-
-  useEffect(() => {
-    settingsRef.current = settings;
-  }, [settings]);
-
-  useEffect(() => {
-    if (!usesExtensionStorage()) {
-      return undefined;
-    }
-
-    let cancelled = false;
-    loadExtensionState(initialNow)
-      .then((state) => {
-        if (cancelled || !state) {
-          return;
-        }
-
-        setItems(state.items);
-        setSettings(state.settings);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          push("No se pudieron cargar los datos de la extensión.", "error");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setStorageReady(true);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [initialNow, push]);
-
-  useEffect(() => {
-    if (!storageReady || !usesExtensionStorage()) {
-      return undefined;
-    }
-
-    return subscribeToExtensionState(() => {
-      loadExtensionState()
-        .then((state) => {
-          if (!state) {
-            return;
-          }
-
-          if (JSON.stringify(state.items) !== JSON.stringify(itemsRef.current)) {
-            setItems(state.items);
-          }
-          if (JSON.stringify(state.settings) !== JSON.stringify(settingsRef.current)) {
-            setSettings(state.settings);
-          }
-        })
-        .catch(() => {
-          // The application keeps the currently displayed state if Chrome storage is temporarily unavailable.
-        });
+    return subscribeToStoredState(({ itemsChanged, settingsChanged }) => {
+      if (itemsChanged) {
+        setItems(loadStoredItems());
+      }
+      if (settingsChanged) {
+        setSettings(loadStoredSettings());
+      }
     });
-  }, [storageReady]);
+  }, []);
 
   useEffect(() => {
     const timerId = window.setInterval(() => {
@@ -129,10 +64,6 @@ export default function CooldownApp() {
   }, []);
 
   useEffect(() => {
-    if (!storageReady) {
-      return;
-    }
-
     void saveStoredItems(items)
       .then((saved) => {
         if (!saved && !persistenceWarningShownRef.current) {
@@ -146,13 +77,9 @@ export default function CooldownApp() {
           push("Los cambios no se han podido guardar en este navegador.", "error");
         }
       });
-  }, [items, push, storageReady]);
+  }, [items, push]);
 
   useEffect(() => {
-    if (!storageReady) {
-      return;
-    }
-
     void saveStoredSettings(settings)
       .then((saved) => {
         if (!saved && !persistenceWarningShownRef.current) {
@@ -166,7 +93,7 @@ export default function CooldownApp() {
           push("Los cambios no se han podido guardar en este navegador.", "error");
         }
       });
-  }, [push, settings, storageReady]);
+  }, [push, settings]);
 
   useEffect(() => {
     const { items: nextItems, completed } = resolveExpiredCooldowns(items, now);
@@ -231,6 +158,10 @@ export default function CooldownApp() {
 
   const handleSaveItem = async (payload) => {
     const existing = items.find((item) => item.id === payload.id) || editing;
+    const duplicate = items.find((item) => item.id !== payload.id && item.url === payload.url);
+    if (duplicate) {
+      throw new Error("Ese sitio ya está guardado.");
+    }
     const isEditing = Boolean(existing);
 
     if (existing && existing.endAt && payload.durationMs !== existing.durationMs) {
@@ -282,6 +213,7 @@ export default function CooldownApp() {
   };
 
   const runCooldownAction = (action, id, message) => {
+    primeAudio();
     const stamp = Date.now();
     setNow(stamp);
     setItems((currentItems) => action(currentItems, id, stamp));
@@ -290,17 +222,7 @@ export default function CooldownApp() {
     }
   };
 
-  const handleOpenSite = (item, event) => {
-    if (isExtensionContext()) {
-      event.preventDefault();
-      globalThis.chrome.runtime.sendMessage({ type: "open-site", siteId: item.id }, (response) => {
-        if (globalThis.chrome.runtime.lastError || !response?.ok) {
-          push(`No se pudo abrir "${item.label || hostnameFromUrl(item.url)}".`, "error");
-        }
-      });
-      return;
-    }
-
+  const handleOpenSite = (item) => {
     runCooldownAction(startCooldown, item.id);
   };
 
@@ -437,7 +359,7 @@ export default function CooldownApp() {
                 <SiteCard
                   item={item}
                   now={now}
-                  onOpen={(event) => handleOpenSite(item, event)}
+                  onOpen={() => handleOpenSite(item)}
                   onStart={() => runCooldownAction(startCooldown, item.id, "Cooldown iniciado.")}
                   onReset={() => runCooldownAction(resetCooldown, item.id, "Cooldown reiniciado.")}
                   onClear={() => runCooldownAction(clearCooldown, item.id, "Cooldown limpiado.")}
@@ -454,9 +376,7 @@ export default function CooldownApp() {
       </main>
 
       <footer className="px-4 pb-10 text-center text-xs text-slate-500 sm:px-6">
-        {extensionMode
-          ? "La extensión mantiene los avisos aunque cierres esta página."
-          : "Las notificaciones con la pestaña totalmente cerrada requieren Web Push o un backend."}
+        Las notificaciones con la pestaña totalmente cerrada requieren Web Push o un backend.
       </footer>
 
       <ToastViewport toasts={toasts} />
@@ -469,6 +389,7 @@ export default function CooldownApp() {
           onExport={handleExport}
           onImport={handleImport}
           onToggleNotifications={toggleNotifications}
+          onPrimeAudio={primeAudio}
           notifSupported={supported}
           permission={permission}
         />

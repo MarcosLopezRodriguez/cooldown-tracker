@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { DURATION_PRESETS } from "../lib/constants.js";
+import { DURATION_PRESETS, MAX_DURATION_MINUTES } from "../lib/constants.js";
 import { clampMinutes, formatMinutesLabel } from "../lib/utils.js";
 
 export default function DurationInput({ minutes, onChangeMinutes, inputId = "duration" }) {
@@ -16,6 +16,7 @@ export default function DurationInput({ minutes, onChangeMinutes, inputId = "dur
           id={inputId}
           type="number"
           min={1}
+          max={MAX_DURATION_MINUTES}
           className="w-28 rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
           value={value}
           onChange={(event) => setValue(event.target.value)}
@@ -25,6 +26,7 @@ export default function DurationInput({ minutes, onChangeMinutes, inputId = "dur
         />
         <span className="text-sm text-slate-600">minutos</span>
       </div>
+      <p className="text-xs text-slate-500">Máximo: 30 días.</p>
 
       <div className="flex flex-wrap gap-2">
         {DURATION_PRESETS.map((preset) => {

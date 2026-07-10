@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { buildFaviconUrl, hostnameFromUrl } from "../lib/utils.js";
+import { hostnameFromUrl } from "../lib/utils.js";
 
 function canNotify() {
   return typeof window !== "undefined" && "Notification" in window;
@@ -32,7 +32,6 @@ function showBrowserNotification(item) {
 
   const notification = new Notification(`Listo para visitar: ${item.label || hostnameFromUrl(item.url)}`, {
     body: "El cooldown ha terminado.",
-    icon: item.favicon || buildFaviconUrl(item.url),
     tag: `cooldown-${item.id}-${Date.now()}`,
   });
 
@@ -46,8 +45,8 @@ export function useNotificationCenter({ notificationsOn, soundOn, push }) {
   const [permission, setPermission] = useState(() => (supported ? Notification.permission : "denied"));
   const audioContextRef = useRef(null);
 
-  const playBeep = useCallback(() => {
-    if (!soundOn || typeof window === "undefined") {
+  const primeAudio = useCallback(() => {
+    if (typeof window === "undefined") {
       return;
     }
 
@@ -57,7 +56,21 @@ export function useNotificationCenter({ notificationsOn, soundOn, push }) {
     }
 
     audioContextRef.current = audioContextRef.current || new AudioContextCtor();
+    if (audioContextRef.current.state === "suspended") {
+      void audioContextRef.current.resume().catch(() => {});
+    }
+  }, []);
+
+  const playBeep = useCallback(() => {
+    if (!soundOn || typeof window === "undefined") {
+      return;
+    }
+
+    primeAudio();
     const context = audioContextRef.current;
+    if (!context || context.state !== "running") {
+      return;
+    }
     const oscillator = context.createOscillator();
     const gainNode = context.createGain();
 
@@ -70,7 +83,7 @@ export function useNotificationCenter({ notificationsOn, soundOn, push }) {
     window.setTimeout(() => {
       oscillator.stop();
     }, 180);
-  }, [soundOn]);
+  }, [primeAudio, soundOn]);
 
   const notifyReady = useCallback(
     (item) => {
@@ -110,5 +123,6 @@ export function useNotificationCenter({ notificationsOn, soundOn, push }) {
     permission,
     toggleNotifications,
     notifyReady,
+    primeAudio,
   };
 }

@@ -20,7 +20,7 @@ export default function SiteCard({ item, now, onOpen, onStart, onReset, onClear,
               <div className="min-w-0 flex-1">
                 <h3 className="truncate text-base font-semibold text-slate-950">{item.label || view.host}</h3>
                 <p className="mt-1 truncate text-sm text-slate-500">
-                  {item.scope === "domain" ? view.host : item.url}
+                  {view.host}
                 </p>
               </div>
               <div className="shrink-0 text-right">

@@ -9,6 +9,7 @@ export default function SettingsPanel({
   onExport,
   onImport,
   onToggleNotifications,
+  onPrimeAudio,
   notifSupported,
   permission,
 }) {
@@ -139,12 +140,13 @@ export default function SettingsPanel({
             </div>
             <Toggle
               checked={settings.soundOn}
-              onClick={() =>
+              onClick={() => {
+                onPrimeAudio();
                 setSettings((currentSettings) => ({
                   ...currentSettings,
                   soundOn: !currentSettings.soundOn,
-                }))
-              }
+                }));
+              }}
               srLabel="Activar sonido"
             />
           </div>

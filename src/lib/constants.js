@@ -15,3 +15,4 @@ export const FILTER_OPTIONS = [
 ];
 
 export const DURATION_PRESETS = [5, 10, 15, 30, 60];
+export const MAX_DURATION_MINUTES = 43_200;

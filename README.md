@@ -1,63 +1,45 @@
-# Cooldown Tracker
+# Cooldown Tracker Web
 
-Cooldown Tracker registra pausas entre visitas a sitios frecuentes. Puede usarse como aplicación web y como extensión de Chrome desde la misma base de código.
+Aplicación web para registrar pausas entre visitas a sitios frecuentes y saber cuándo vuelve a estar disponible cada uno.
 
 ## Funciones
 
 - Guarda sitios con una duración de cooldown independiente.
 - Inicia el temporizador al abrir un sitio desde la aplicación o al marcar una visita.
 - Filtra, busca y ordena los sitios por estado.
+- Sincroniza cambios entre pestañas abiertas de la aplicación.
 - Exporta e importa datos en JSON versionado.
-- Muestra avisos y sonido mientras la aplicación está abierta.
-- En la extensión de Chrome, bloquea la navegación de sitios en cooldown y avisa incluso si la página de la aplicación está cerrada.
+- Muestra notificaciones y sonido mientras la aplicación está abierta.
 
-## Aplicación web
+## Desarrollo
 
 ```bash
 npm install
 npm run dev
 ```
 
-Para generar la versión web de producción:
+Vite mostrará una URL local, normalmente `http://localhost:5173`.
+
+## Producción
 
 ```bash
 npm run build
 npm run preview
 ```
 
-La versión web puede registrar y mostrar cooldowns, pero no puede impedir que navegues a otros sitios desde el navegador. Esa función pertenece a la extensión.
-
-## Extensión de Chrome
-
-Genera el paquete:
-
-```bash
-npm run build:extension
-```
-
-Después, en Chrome abre `chrome://extensions`, activa el modo de desarrollador y selecciona **Cargar descomprimida**. Elige la carpeta `dist` generada por el build.
-
-La extensión solicita acceso a páginas `http` y `https` para poder detectar y redirigir una navegación cuando exista un cooldown activo. Los datos se almacenan localmente en Chrome mediante `chrome.storage`.
-
-Al abrir un sitio desde la extensión, esa visita queda permitida y reinicia su cooldown. A partir de ahí:
-
-- `Dominio completo` bloquea ese dominio y sus subdominios.
-- `URL exacta` bloquea únicamente el enlace guardado.
-
-La aplicación web y la extensión usan almacenes distintos por seguridad del navegador. Usa la exportación e importación JSON para mover tus datos entre ambas instalaciones.
+La salida se genera en `dist` y puede desplegarse en cualquier alojamiento de archivos estáticos.
 
 ## Datos y avisos
 
-Los datos exportados contienen `version`, `items`, `settings` y `exportedAt`. La importación admite archivos de hasta 2 MB y rechaza formatos creados por una versión más reciente de la aplicación.
+Los datos se guardan en el almacenamiento local del navegador. Puedes exportarlos antes de cambiar de equipo o navegador e importarlos después desde la configuración.
 
-Los avisos de la extensión se programan con alarmas de Chrome. Para recibirlos, activa la opción de notificaciones desde la configuración de la aplicación y concede el permiso correspondiente.
+La duración máxima de un cooldown es de 30 días. Las notificaciones requieren permiso del navegador y, sin Web Push o un backend, no se mantienen cuando todas las pestañas de la aplicación están cerradas.
 
-## Comandos disponibles
+## Comandos
 
 ```bash
 npm run dev
 npm run build
-npm run build:extension
 npm run preview
 npm run lint
 ```
@@ -66,6 +48,5 @@ npm run lint
 
 - [src/App.jsx](C:/Users/Marcos/Documents/Proyectos/cooldown-tracker/src/App.jsx): estado y flujos principales.
 - [src/lib/sites.js](C:/Users/Marcos/Documents/Proyectos/cooldown-tracker/src/lib/sites.js): normalización, importación y reglas de cooldown.
-- [src/lib/storage.js](C:/Users/Marcos/Documents/Proyectos/cooldown-tracker/src/lib/storage.js): persistencia web y persistencia de extensión.
-- [public/background.js](C:/Users/Marcos/Documents/Proyectos/cooldown-tracker/public/background.js): alarmas, navegación y avisos de Chrome.
-- [public/blocked.html](C:/Users/Marcos/Documents/Proyectos/cooldown-tracker/public/blocked.html): página que se muestra durante un bloqueo activo.
+- [src/lib/storage.js](C:/Users/Marcos/Documents/Proyectos/cooldown-tracker/src/lib/storage.js): persistencia y sincronización entre pestañas.
+- [src/components](C:/Users/Marcos/Documents/Proyectos/cooldown-tracker/src/components): interfaz de sitios, configuración y diálogos.

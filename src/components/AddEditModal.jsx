@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import DialogShell from "./DialogShell.jsx";
 import DurationInput from "./DurationInput.jsx";
 import FaviconBadge from "./FaviconBadge.jsx";
-import { buildFaviconUrl, clampMinutes, hostnameFromUrl, isExtensionContext, normalizeUrl } from "../lib/utils.js";
+import { clampMinutes, hostnameFromUrl, normalizeUrl } from "../lib/utils.js";
 
 export default function AddEditModal({ initial, defaultDurationMs, onClose, onSave }) {
   const inputRef = useRef(null);
@@ -16,7 +16,6 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
 
     return initial.label !== hostnameFromUrl(initial.url);
   });
-  const [scope, setScope] = useState(initial?.scope || "domain");
   const [minutes, setMinutes] = useState(
     initial ? Math.round(initial.durationMs / 60_000) : Math.max(1, Math.round(defaultDurationMs / 60_000)),
   );
@@ -31,7 +30,6 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
 
   const normalizedUrl = useMemo(() => normalizeUrl(url), [url]);
   const host = normalizedUrl ? hostnameFromUrl(normalizedUrl) : "";
-  const favicon = normalizedUrl ? buildFaviconUrl(normalizedUrl) : null;
   const isValid = Boolean(normalizedUrl) && minutes > 0;
 
   useEffect(() => {
@@ -43,8 +41,6 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
       setLabel(host);
     }
   }, [host, isCustomLabel]);
-
-  const extensionMode = isExtensionContext();
 
   const save = async () => {
     if (isSubmitting) {
@@ -70,11 +66,9 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
         id: initial?.id,
         url: safeUrl,
         label: (label || hostName).trim(),
-        scope,
         durationMs,
         endAt: initial?.endAt ?? null,
         lastVisitedAt: initial?.lastVisitedAt ?? null,
-        favicon: buildFaviconUrl(safeUrl),
         createdAt: initial?.createdAt ?? now,
       });
     } catch (error) {
@@ -122,7 +116,7 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
         <div className="flex justify-center">
           <div className="relative">
             <FaviconBadge
-              src={favicon}
+              src={null}
               label={label || host}
               sizeClassName="h-16 w-16"
               imageClassName="h-8 w-8"
@@ -193,34 +187,6 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
           <DurationInput inputId="site-duration" minutes={minutes} onChangeMinutes={setMinutes} />
         </div>
 
-        <div className="space-y-3 pt-2">
-          <span className="block text-sm font-medium text-slate-700">
-            {extensionMode ? "Ámbito de bloqueo" : "Ámbito para la extensión"}
-          </span>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <ScopeButton
-              selected={scope === "domain"}
-              title="Dominio completo"
-              description={
-                extensionMode
-                  ? "Bloquea las páginas del dominio mientras el cooldown esté activo."
-                  : "Se aplicará al usar tus datos desde la extensión de Chrome."
-              }
-              onClick={() => setScope("domain")}
-            />
-            <ScopeButton
-              selected={scope === "exact"}
-              title="URL exacta"
-              description={
-                extensionMode
-                  ? "Bloquea únicamente el enlace guardado mientras el cooldown esté activo."
-                  : "Se aplicará al usar tus datos desde la extensión de Chrome."
-              }
-              onClick={() => setScope("exact")}
-            />
-          </div>
-        </div>
-
         {formError ? <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{formError}</p> : null}
       </div>
 
@@ -245,30 +211,6 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
         </button>
       </div>
     </DialogShell>
-  );
-}
-
-function ScopeButton({ selected, title, description, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-lg border-2 p-4 text-left transition ${
-        selected ? "border-slate-950 bg-slate-50" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        <div
-          className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${
-            selected ? "border-slate-950 bg-slate-950 text-white" : "border-slate-300 bg-white text-transparent"
-          }`}
-        >
-          <CheckIcon />
-        </div>
-        <span className="font-medium text-slate-800">{title}</span>
-      </div>
-      <p className="mt-2 pl-8 text-xs text-slate-500">{description}</p>
-    </button>
   );
 }
 

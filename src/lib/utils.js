@@ -2,10 +2,6 @@ export function uid() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function isExtensionContext() {
-  return Boolean(globalThis.chrome?.runtime?.id && globalThis.location?.protocol === "chrome-extension:");
-}
-
 export function normalizeUrl(input) {
   try {
     const tentative = String(input || "").trim();
@@ -49,18 +45,9 @@ export function formatMinutesLabel(minutes) {
   return `${hours} ${hours === 1 ? "hora" : "horas"}`;
 }
 
-export function clampMinutes(value, fallback = 1) {
+export function clampMinutes(value, fallback = 1, maximum = 43_200) {
   const parsed = Number.parseInt(String(value || ""), 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-export function buildFaviconUrl(value) {
-  if (!value || isExtensionContext()) {
-    return null;
-  }
-
-  const host = value.includes("://") ? hostnameFromUrl(value) : value;
-  return host ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64` : null;
+  return Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, maximum) : fallback;
 }
 
 export function downloadJsonFile(filename, text) {
@@ -69,8 +56,10 @@ export function downloadJsonFile(filename, text) {
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
+  document.body.append(anchor);
   anchor.click();
-  URL.revokeObjectURL(url);
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 export function asTimestamp(value, fallback = null) {

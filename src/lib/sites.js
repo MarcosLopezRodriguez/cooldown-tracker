@@ -1,5 +1,5 @@
-import { DEFAULT_SETTINGS, EXPORT_SCHEMA_VERSION } from "./constants.js";
-import { asTimestamp, buildFaviconUrl, hostnameFromUrl, isExtensionContext, normalizeUrl, uid } from "./utils.js";
+import { DEFAULT_SETTINGS, EXPORT_SCHEMA_VERSION, MAX_DURATION_MINUTES } from "./constants.js";
+import { asTimestamp, hostnameFromUrl, normalizeUrl, uid } from "./utils.js";
 
 function normalizeDurationMs(value, fallback = DEFAULT_SETTINGS.defaultDurationMs) {
   const parsed = Number(value);
@@ -7,15 +7,7 @@ function normalizeDurationMs(value, fallback = DEFAULT_SETTINGS.defaultDurationM
     return fallback;
   }
 
-  return Math.max(60_000, Math.round(parsed));
-}
-
-function normalizeScope(value) {
-  if (value === "url" || value === "exact") {
-    return "exact";
-  }
-
-  return "domain";
+  return Math.min(MAX_DURATION_MINUTES * 60_000, Math.max(60_000, Math.round(parsed)));
 }
 
 function sanitizeLabel(value, fallback) {
@@ -77,16 +69,11 @@ export function normalizeSite(input, options = {}) {
     id: typeof input.id === "string" && input.id.trim() ? input.id : uid(),
     url,
     label: sanitizeLabel(input.label, host),
-    scope: normalizeScope(input.scope),
     durationMs,
     endAt,
     lastVisitedAt,
     createdAt,
     updatedAt,
-    favicon:
-      !isExtensionContext() && typeof input.favicon === "string" && input.favicon.trim()
-        ? input.favicon
-        : buildFaviconUrl(host),
   };
 }
 
