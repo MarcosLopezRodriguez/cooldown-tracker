@@ -16,6 +16,17 @@
     font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   }
 
+  html[data-shell="extension"],
+  html[data-shell="extension"] body,
+  html[data-shell="extension"] #root {
+    min-width: 420px;
+    min-height: 600px;
+  }
+
+  html[data-shell="extension"] body {
+    overflow: auto;
+  }
+
   button,
   input,
   select,

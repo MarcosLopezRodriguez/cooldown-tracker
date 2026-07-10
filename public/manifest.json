@@ -6,7 +6,8 @@
   "permissions": ["alarms", "notifications", "storage", "tabs", "webNavigation"],
   "host_permissions": ["http://*/*", "https://*/*"],
   "action": {
-    "default_title": "Abrir Cooldown Tracker"
+    "default_title": "Abrir Cooldown Tracker",
+    "default_popup": "index.html"
   },
   "background": {
     "service_worker": "background.js"
