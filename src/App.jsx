@@ -222,8 +222,7 @@ export default function CooldownApp() {
     setEditing(null);
   };
 
-  const commitItem = (payload, message) => {
-    const stamp = Date.now();
+  const commitItem = (payload, message, stamp = Date.now()) => {
     setNow(stamp);
     setItems((currentItems) => upsertSite(currentItems, payload, stamp));
     push(message, "success");
@@ -235,6 +234,21 @@ export default function CooldownApp() {
 
     if (existing && existing.endAt && payload.durationMs !== existing.durationMs) {
       setDurationDecision({ payload, existing });
+      closeForm();
+      return;
+    }
+
+    if (!isEditing && extensionMode) {
+      const stamp = Date.now();
+      commitItem(
+        {
+          ...payload,
+          lastVisitedAt: stamp,
+          endAt: stamp + payload.durationMs,
+        },
+        "Sitio añadido y bloqueo activado.",
+        stamp,
+      );
       closeForm();
       return;
     }
@@ -437,8 +451,15 @@ export default function CooldownApp() {
                 <SiteCard
                   item={item}
                   now={now}
+                  extensionMode={extensionMode}
                   onOpen={(event) => handleOpenSite(item, event)}
-                  onStart={() => runCooldownAction(startCooldown, item.id, "Cooldown iniciado.")}
+                  onStart={() =>
+                    runCooldownAction(
+                      startCooldown,
+                      item.id,
+                      extensionMode ? "Bloqueo activado." : "Cooldown iniciado.",
+                    )
+                  }
                   onReset={() => runCooldownAction(resetCooldown, item.id, "Cooldown reiniciado.")}
                   onClear={() => runCooldownAction(clearCooldown, item.id, "Cooldown limpiado.")}
                   onEdit={() => {

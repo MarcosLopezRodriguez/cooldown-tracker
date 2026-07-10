@@ -3,7 +3,17 @@ import FaviconBadge from "./FaviconBadge.jsx";
 import { formatClock } from "../lib/utils.js";
 import { getSiteView } from "../lib/sites.js";
 
-export default function SiteCard({ item, now, onOpen, onStart, onReset, onClear, onEdit, onDelete }) {
+export default function SiteCard({
+  item,
+  now,
+  extensionMode = false,
+  onOpen,
+  onStart,
+  onReset,
+  onClear,
+  onEdit,
+  onDelete,
+}) {
   const view = getSiteView(item, now);
   const statusText = view.ready ? "Listo" : formatClock(view.remaining);
 
@@ -69,7 +79,7 @@ export default function SiteCard({ item, now, onOpen, onStart, onReset, onClear,
             className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
           >
             <ClockIcon />
-            Marcar visitado
+            {extensionMode && view.ready ? "Bloquear ahora" : "Marcar visitado"}
           </button>
 
           {!view.ready ? (

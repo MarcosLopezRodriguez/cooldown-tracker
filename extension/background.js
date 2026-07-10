@@ -93,6 +93,67 @@ function isAllowedNavigation(details, targetUrl) {
   return pendingUntil > Date.now();
 }
 
+function isAllowedTab(tabId) {
+  if (typeof tabId !== "number") {
+    return false;
+  }
+
+  const allowedUntil = allowedTabs.get(tabId);
+  if (!allowedUntil) {
+    return false;
+  }
+
+  if (allowedUntil > Date.now()) {
+    return true;
+  }
+
+  allowedTabs.delete(tabId);
+  return false;
+}
+
+async function redirectBlockedTab(tabId, blockingItem, targetUrl) {
+  const params = new URLSearchParams({
+    label: blockingItem.label || targetUrl.hostname,
+    endAt: String(blockingItem.endAt),
+  });
+
+  await chrome.tabs.update(tabId, {
+    url: chrome.runtime.getURL(`blocked.html?${params.toString()}`),
+  });
+}
+
+async function enforceActiveCooldowns(items) {
+  const activeItems = items.filter((item) => isActive(item));
+  if (!activeItems.length) {
+    return;
+  }
+
+  const tabs = await chrome.tabs.query({});
+  await Promise.all(
+    tabs.map(async (tab) => {
+      if (typeof tab.id !== "number" || !tab.url || isAllowedTab(tab.id)) {
+        return;
+      }
+
+      let targetUrl;
+      try {
+        targetUrl = new URL(tab.url);
+      } catch {
+        return;
+      }
+
+      if (targetUrl.protocol !== "http:" && targetUrl.protocol !== "https:") {
+        return;
+      }
+
+      const blockingItem = activeItems.find((item) => matchesScope(item, targetUrl));
+      if (blockingItem) {
+        await redirectBlockedTab(tab.id, blockingItem, targetUrl);
+      }
+    }),
+  );
+}
+
 async function openSiteFromApp(siteId) {
   const { items } = await readState();
   const site = items.find((item) => item.id === siteId);
@@ -144,6 +205,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === "local" && changes[ITEMS_KEY]) {
     const items = Array.isArray(changes[ITEMS_KEY].newValue) ? changes[ITEMS_KEY].newValue : [];
     void syncCooldownAlarms(items);
+    void enforceActiveCooldowns(items);
   }
 });
 
@@ -198,12 +260,6 @@ chrome.webNavigation.onBeforeNavigate.addListener((details) => {
       return;
     }
 
-    const params = new URLSearchParams({
-      label: blockingItem.label || targetUrl.hostname,
-      endAt: String(blockingItem.endAt),
-    });
-    await chrome.tabs.update(details.tabId, {
-      url: chrome.runtime.getURL(`blocked.html?${params.toString()}`),
-    });
+    await redirectBlockedTab(details.tabId, blockingItem, targetUrl);
   })();
 });

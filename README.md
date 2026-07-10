@@ -46,6 +46,8 @@ Al abrir un sitio desde la extensión, esa visita queda permitida y reinicia su 
 - `Dominio completo` bloquea ese dominio y sus subdominios.
 - `URL exacta` bloquea únicamente el enlace guardado.
 
+Al añadir un sitio desde el popup de la extensión, el cooldown empieza en ese momento para que el dominio quede bloqueado inmediatamente.
+
 La aplicación web y la extensión usan almacenes distintos por seguridad del navegador. Usa la exportación e importación JSON para mover tus datos entre ambas instalaciones.
 
 ## Datos y avisos
