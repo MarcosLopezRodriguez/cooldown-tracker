@@ -8,42 +8,42 @@ export default function SiteCard({ item, now, onOpen, onStart, onReset, onClear,
   const statusText = view.ready ? "Listo" : formatClock(view.remaining);
 
   return (
-    <article className="group relative overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
-      <div className={`absolute inset-y-0 left-0 w-1.5 ${view.ready ? "bg-emerald-500" : "bg-amber-500"}`} />
+    <article className="group relative overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+      <div className={`h-1 w-full ${view.ready ? "bg-emerald-500" : "bg-amber-500"}`} />
 
-      <div className="p-5">
+      <div className="p-4">
         <div className="flex items-start gap-4">
           <FaviconBadge src={item.favicon} label={item.label || view.host} />
 
           <div className="min-w-0 flex-1">
             <div className="flex items-start gap-3">
               <div className="min-w-0 flex-1">
-                <h3 className="truncate text-lg font-semibold text-slate-900">{item.label || view.host}</h3>
+                <h3 className="truncate text-base font-semibold text-slate-950">{item.label || view.host}</h3>
                 <p className="mt-1 truncate text-sm text-slate-500">
                   {item.scope === "domain" ? view.host : item.url}
                 </p>
               </div>
-              <div className="text-right">
+              <div className="shrink-0 text-right">
                 <span
-                  className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                    view.ready ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                  className={`inline-flex rounded-md px-2 py-1 text-xs font-medium ${
+                    view.ready ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
                   }`}
                 >
                   {view.ready ? "Listo" : "En cooldown"}
                 </span>
-                <div className="mt-2 font-mono text-sm tabular-nums text-slate-500">{statusText}</div>
+                <div className="mt-2 font-mono text-sm tabular-nums text-slate-600">{statusText}</div>
               </div>
             </div>
 
             {!view.ready ? (
-              <div className="mt-4 space-y-1">
+              <div className="mt-4 space-y-1.5">
                 <div className="flex items-center justify-between text-xs text-slate-500">
                   <span>Progreso</span>
                   <span>{view.progress}%</span>
                 </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                <div className="h-2 overflow-hidden rounded-full bg-slate-100">
                   <div
-                    className={`h-full rounded-full transition-all ${view.progress > 80 ? "bg-emerald-500" : "bg-blue-500"}`}
+                    className={`h-full rounded-full transition-all ${view.progress > 80 ? "bg-emerald-500" : "bg-amber-500"}`}
                     style={{ width: `${view.progress}%` }}
                   />
                 </div>
@@ -52,19 +52,21 @@ export default function SiteCard({ item, now, onOpen, onStart, onReset, onClear,
           </div>
         </div>
 
-        <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
-          <button
-            type="button"
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noopener noreferrer"
             onClick={onOpen}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-slate-950 px-3 text-sm font-medium text-white transition hover:bg-slate-800"
           >
             <PlayIcon />
             Abrir
-          </button>
+          </a>
           <button
             type="button"
             onClick={onStart}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
           >
             <ClockIcon />
             Marcar visitado
@@ -75,7 +77,7 @@ export default function SiteCard({ item, now, onOpen, onStart, onReset, onClear,
               <button
                 type="button"
                 onClick={onReset}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
               >
                 <RefreshIcon />
                 Reiniciar
@@ -83,7 +85,7 @@ export default function SiteCard({ item, now, onOpen, onStart, onReset, onClear,
               <button
                 type="button"
                 onClick={onClear}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
               >
                 Limpiar
               </button>
@@ -94,7 +96,7 @@ export default function SiteCard({ item, now, onOpen, onStart, onReset, onClear,
             <button
               type="button"
               onClick={onEdit}
-              className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+              className="rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
               title="Editar"
               aria-label="Editar sitio"
             >
@@ -103,7 +105,7 @@ export default function SiteCard({ item, now, onOpen, onStart, onReset, onClear,
             <button
               type="button"
               onClick={onDelete}
-              className="rounded-xl p-2 text-rose-500 transition hover:bg-rose-50 hover:text-rose-600"
+              className="rounded-md p-2 text-rose-500 transition hover:bg-rose-50 hover:text-rose-600"
               title="Eliminar"
               aria-label="Eliminar sitio"
             >

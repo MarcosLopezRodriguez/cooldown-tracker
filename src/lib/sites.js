@@ -1,5 +1,5 @@
 import { DEFAULT_SETTINGS, EXPORT_SCHEMA_VERSION } from "./constants.js";
-import { asTimestamp, buildFaviconUrl, hostnameFromUrl, normalizeUrl, uid } from "./utils.js";
+import { asTimestamp, buildFaviconUrl, hostnameFromUrl, isExtensionContext, normalizeUrl, uid } from "./utils.js";
 
 function normalizeDurationMs(value, fallback = DEFAULT_SETTINGS.defaultDurationMs) {
   const parsed = Number(value);
@@ -26,8 +26,6 @@ function sanitizeLabel(value, fallback) {
 export function normalizeSettings(input) {
   const source = input && typeof input === "object" ? input : {};
   return {
-    ...DEFAULT_SETTINGS,
-    ...source,
     defaultDurationMs: normalizeDurationMs(source.defaultDurationMs, DEFAULT_SETTINGS.defaultDurationMs),
     notificationsOn:
       typeof source.notificationsOn === "boolean"
@@ -86,7 +84,9 @@ export function normalizeSite(input, options = {}) {
     createdAt,
     updatedAt,
     favicon:
-      typeof input.favicon === "string" && input.favicon.trim() ? input.favicon : buildFaviconUrl(host),
+      !isExtensionContext() && typeof input.favicon === "string" && input.favicon.trim()
+        ? input.favicon
+        : buildFaviconUrl(host),
   };
 }
 
@@ -118,12 +118,17 @@ export function parseImportPayload(text, options = {}) {
   try {
     rawPayload = JSON.parse(text);
   } catch {
-    throw new Error("El archivo no contiene JSON valido.");
+    throw new Error("El archivo no contiene JSON válido.");
   }
 
   const payload = Array.isArray(rawPayload) ? { version: 1, items: rawPayload } : rawPayload;
   if (!payload || typeof payload !== "object") {
     throw new Error("El archivo no tiene un formato importable.");
+  }
+
+  const version = Number(payload.version) || 1;
+  if (version > EXPORT_SCHEMA_VERSION) {
+    throw new Error("El archivo se creó con una versión más reciente de la aplicación.");
   }
 
   const settings = payload.settings ? normalizeSettings(payload.settings) : null;
@@ -134,11 +139,11 @@ export function parseImportPayload(text, options = {}) {
   });
 
   if (!items.length && !settings) {
-    throw new Error("No se encontraron sitios ni ajustes validos para importar.");
+    throw new Error("No se encontraron sitios ni ajustes válidos para importar.");
   }
 
   return {
-    version: Number(payload.version) || 1,
+    version,
     hasItems: Array.isArray(payload.items),
     items,
     settings,

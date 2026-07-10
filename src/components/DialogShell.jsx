@@ -92,7 +92,7 @@ export default function DialogShell({
   const basePanelClassName =
     variant === "side"
       ? "flex h-full w-full max-w-md flex-col bg-white shadow-2xl"
-      : "w-full max-w-xl rounded-3xl bg-white shadow-2xl";
+      : "w-full max-w-xl rounded-lg bg-white shadow-2xl";
 
   return (
     <div

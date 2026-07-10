@@ -2,13 +2,20 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import DialogShell from "./DialogShell.jsx";
 import DurationInput from "./DurationInput.jsx";
 import FaviconBadge from "./FaviconBadge.jsx";
-import { buildFaviconUrl, clampMinutes, hostnameFromUrl, normalizeUrl } from "../lib/utils.js";
+import { buildFaviconUrl, clampMinutes, hostnameFromUrl, isExtensionContext, normalizeUrl } from "../lib/utils.js";
 
 export default function AddEditModal({ initial, defaultDurationMs, onClose, onSave }) {
   const inputRef = useRef(null);
   const closeButtonRef = useRef(null);
   const [url, setUrl] = useState(initial?.url || "");
   const [label, setLabel] = useState(initial?.label || "");
+  const [isCustomLabel, setIsCustomLabel] = useState(() => {
+    if (!initial?.label || !initial?.url) {
+      return false;
+    }
+
+    return initial.label !== hostnameFromUrl(initial.url);
+  });
   const [scope, setScope] = useState(initial?.scope || "domain");
   const [minutes, setMinutes] = useState(
     initial ? Math.round(initial.durationMs / 60_000) : Math.max(1, Math.round(defaultDurationMs / 60_000)),
@@ -32,10 +39,12 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
       return;
     }
 
-    if (!initial?.label && !label) {
+    if (!isCustomLabel) {
       setLabel(host);
     }
-  }, [host, initial?.label, label]);
+  }, [host, isCustomLabel]);
+
+  const extensionMode = isExtensionContext();
 
   const save = async () => {
     if (isSubmitting) {
@@ -45,7 +54,7 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
     const safeMinutes = clampMinutes(minutes, Math.max(1, Math.round(defaultDurationMs / 60_000)));
     const safeUrl = normalizeUrl(url);
     if (!safeUrl) {
-      setFormError("Introduce una URL valida.");
+      setFormError("Introduce una URL válida.");
       return;
     }
 
@@ -89,12 +98,12 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 id="site-modal-title" className="text-xl font-semibold text-slate-900">
-              {initial ? "Editar sitio" : "Anadir nuevo sitio"}
+              {initial ? "Editar sitio" : "Añadir nuevo sitio"}
             </h2>
             <p id="site-modal-description" className="mt-1 text-sm text-slate-500">
               {initial
-                ? "Actualiza el sitio y su configuracion de cooldown."
-                : "Define la URL, el nombre visible y la duracion del nuevo cooldown."}
+                ? "Actualiza el sitio y su configuración de cooldown."
+                : "Define la URL, el nombre visible y la duración del nuevo cooldown."}
             </p>
           </div>
           <button
@@ -119,7 +128,7 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
               imageClassName="h-8 w-8"
             />
             {normalizedUrl ? (
-              <div className="absolute -bottom-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-blue-500 text-white shadow-sm">
+                <div className="absolute -bottom-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-emerald-500 text-white shadow-sm">
                 <CheckIcon />
               </div>
             ) : null}
@@ -144,7 +153,7 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
                 setUrl(event.target.value);
                 setFormError("");
               }}
-              className="block w-full rounded-2xl border border-slate-300 py-2.5 pl-10 pr-3 text-sm shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="block w-full rounded-lg border border-slate-300 py-2.5 pl-10 pr-3 text-sm shadow-sm transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   save();
@@ -164,8 +173,11 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
             placeholder="Mi sitio web"
             maxLength={30}
             value={label}
-            onChange={(event) => setLabel(event.target.value)}
-            className="block w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            onChange={(event) => {
+              setLabel(event.target.value);
+              setIsCustomLabel(Boolean(event.target.value.trim()) && event.target.value.trim() !== host);
+            }}
+            className="block w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
             onKeyDown={(event) => {
               if (event.key === "Enter") {
                 save();
@@ -182,31 +194,41 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
         </div>
 
         <div className="space-y-3 pt-2">
-          <span className="block text-sm font-medium text-slate-700">Ambito de bloqueo</span>
+          <span className="block text-sm font-medium text-slate-700">
+            {extensionMode ? "Ámbito de bloqueo" : "Ámbito para la extensión"}
+          </span>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <ScopeButton
               selected={scope === "domain"}
               title="Dominio completo"
-              description="Bloquea cualquier pagina del dominio."
+              description={
+                extensionMode
+                  ? "Bloquea las páginas del dominio mientras el cooldown esté activo."
+                  : "Se aplicará al usar tus datos desde la extensión de Chrome."
+              }
               onClick={() => setScope("domain")}
             />
             <ScopeButton
               selected={scope === "exact"}
               title="URL exacta"
-              description="Solo aplica al enlace guardado."
+              description={
+                extensionMode
+                  ? "Bloquea únicamente el enlace guardado mientras el cooldown esté activo."
+                  : "Se aplicará al usar tus datos desde la extensión de Chrome."
+              }
               onClick={() => setScope("exact")}
             />
           </div>
         </div>
 
-        {formError ? <p className="rounded-2xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{formError}</p> : null}
+        {formError ? <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{formError}</p> : null}
       </div>
 
       <div className="flex flex-wrap justify-end gap-3 border-t border-slate-100 px-6 py-4">
         <button
           type="button"
           onClick={onClose}
-          className="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
           disabled={isSubmitting}
         >
           Cancelar
@@ -215,11 +237,11 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
           type="button"
           onClick={save}
           disabled={!isValid || isSubmitting}
-          className={`rounded-2xl px-4 py-2.5 text-sm font-medium text-white transition ${
-            !isValid || isSubmitting ? "cursor-not-allowed bg-blue-300" : "bg-blue-600 hover:bg-blue-700"
+          className={`rounded-lg px-4 py-2.5 text-sm font-medium text-white transition ${
+            !isValid || isSubmitting ? "cursor-not-allowed bg-slate-300" : "bg-slate-950 hover:bg-slate-800"
           }`}
         >
-          {isSubmitting ? (initial ? "Guardando..." : "Anadiendo...") : initial ? "Guardar cambios" : "Anadir sitio"}
+          {isSubmitting ? (initial ? "Guardando..." : "Añadiendo...") : initial ? "Guardar cambios" : "Añadir sitio"}
         </button>
       </div>
     </DialogShell>
@@ -231,14 +253,14 @@ function ScopeButton({ selected, title, description, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-2xl border-2 p-4 text-left transition ${
-        selected ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+      className={`rounded-lg border-2 p-4 text-left transition ${
+        selected ? "border-slate-950 bg-slate-50" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
       }`}
     >
       <div className="flex items-center gap-3">
         <div
           className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${
-            selected ? "border-blue-500 bg-blue-500 text-white" : "border-slate-300 bg-white text-transparent"
+            selected ? "border-slate-950 bg-slate-950 text-white" : "border-slate-300 bg-white text-transparent"
           }`}
         >
           <CheckIcon />

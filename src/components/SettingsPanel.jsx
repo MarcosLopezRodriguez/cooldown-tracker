@@ -23,6 +23,15 @@ export default function SettingsPanel({
       return;
     }
 
+    if (file.size > 2 * 1024 * 1024) {
+      setImportMessage({
+        tone: "error",
+        text: "El archivo supera el límite de 2 MB.",
+      });
+      event.target.value = "";
+      return;
+    }
+
     try {
       await onImport(file);
       setImportMessage({
@@ -51,10 +60,10 @@ export default function SettingsPanel({
       <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
         <div>
           <h2 id="settings-title" className="text-xl font-semibold text-slate-900">
-            Configuracion
+            Configuración
           </h2>
           <p id="settings-description" className="mt-1 text-sm text-slate-500">
-            Ajusta notificaciones, sonidos y la duracion por defecto de nuevos sitios.
+            Ajusta notificaciones, sonidos y la duración por defecto de nuevos sitios.
           </p>
         </div>
         <button
@@ -62,7 +71,7 @@ export default function SettingsPanel({
           type="button"
           onClick={onClose}
           className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-          aria-label="Cerrar configuracion"
+          aria-label="Cerrar configuración"
         >
           <CloseIcon />
         </button>
@@ -71,9 +80,9 @@ export default function SettingsPanel({
       <div className="flex-1 divide-y divide-slate-100 overflow-y-auto">
         <section className="space-y-4 px-6 py-5">
           <div>
-            <h3 className="text-sm font-semibold text-slate-900">Duracion por defecto</h3>
+            <h3 className="text-sm font-semibold text-slate-900">Duración por defecto</h3>
             <p className="mt-1 text-sm text-slate-500">
-              Se aplica a los sitios nuevos. Los existentes conservan su duracion actual.
+              Se aplica a los sitios nuevos. Los existentes conservan su duración actual.
             </p>
           </div>
           <DurationInput
@@ -116,7 +125,7 @@ export default function SettingsPanel({
                 ? "Permiso concedido."
                 : permission === "denied"
                   ? "Permiso bloqueado en el navegador."
-                  : "Se solicitara permiso al activarlas."}
+                  : "Se solicitará permiso al activarlas."}
           </p>
         </section>
 
@@ -153,13 +162,13 @@ export default function SettingsPanel({
             <button
               type="button"
               onClick={onExport}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
             >
               <DownloadIcon />
               Exportar datos
             </button>
 
-            <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
+            <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
               <UploadIcon />
               Importar datos
               <input type="file" className="hidden" accept=".json" onChange={handleImportChange} />
@@ -190,7 +199,7 @@ function Toggle({ checked, disabled = false, onClick, srLabel }) {
       onClick={onClick}
       disabled={disabled}
       className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition ${
-        checked ? "bg-blue-600" : "bg-slate-200"
+        checked ? "bg-emerald-600" : "bg-slate-200"
       } ${disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
     >
       <span className="sr-only">{srLabel}</span>

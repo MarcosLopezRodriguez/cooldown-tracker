@@ -6,7 +6,7 @@ function toneClassName(tone) {
     case "danger":
       return "bg-rose-600 text-white hover:bg-rose-700";
     case "primary":
-      return "bg-blue-600 text-white hover:bg-blue-700";
+      return "bg-slate-950 text-white hover:bg-slate-800";
     default:
       return "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50";
   }
@@ -29,7 +29,7 @@ export default function ActionDialog({ title, description, actions, onClose }) {
             type="button"
             onClick={onClose}
             className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-            aria-label="Cerrar dialogo"
+            aria-label="Cerrar diálogo"
           >
             <CloseIcon />
           </button>
@@ -42,7 +42,7 @@ export default function ActionDialog({ title, description, actions, onClose }) {
             key={action.label}
             type="button"
             onClick={action.onSelect}
-            className={`rounded-2xl px-4 py-2.5 text-sm font-medium transition ${toneClassName(action.tone)}`}
+            className={`rounded-lg px-4 py-2.5 text-sm font-medium transition ${toneClassName(action.tone)}`}
           >
             {action.label}
           </button>

@@ -17,16 +17,27 @@ import {
   startCooldown,
   upsertSite,
 } from "./lib/sites.js";
-import { loadStoredItems, loadStoredSettings, saveStoredItems, saveStoredSettings } from "./lib/storage.js";
-import { downloadJsonFile, hostnameFromUrl } from "./lib/utils.js";
+import {
+  loadExtensionState,
+  loadStoredItems,
+  loadStoredSettings,
+  saveStoredItems,
+  saveStoredSettings,
+  subscribeToExtensionState,
+  usesExtensionStorage,
+} from "./lib/storage.js";
+import { downloadJsonFile, formatClock, hostnameFromUrl, isExtensionContext } from "./lib/utils.js";
 import { useNotificationCenter } from "./hooks/useNotificationCenter.js";
 import { useToasts } from "./hooks/useToasts.js";
 
 export default function CooldownApp() {
-  const initialNow = Date.now();
+  const initialNowRef = useRef(Date.now());
+  const initialNow = initialNowRef.current;
+  const extensionMode = isExtensionContext();
   const [now, setNow] = useState(initialNow);
   const [items, setItems] = useState(() => loadStoredItems(initialNow));
   const [settings, setSettings] = useState(() => loadStoredSettings());
+  const [storageReady, setStorageReady] = useState(() => !usesExtensionStorage());
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -41,6 +52,73 @@ export default function CooldownApp() {
     push,
   });
   const notifiedRef = useRef(new Set());
+  const itemsRef = useRef(items);
+  const settingsRef = useRef(settings);
+  const persistenceWarningShownRef = useRef(false);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
+  useEffect(() => {
+    if (!usesExtensionStorage()) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    loadExtensionState(initialNow)
+      .then((state) => {
+        if (cancelled || !state) {
+          return;
+        }
+
+        setItems(state.items);
+        setSettings(state.settings);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          push("No se pudieron cargar los datos de la extensión.", "error");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setStorageReady(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialNow, push]);
+
+  useEffect(() => {
+    if (!storageReady || !usesExtensionStorage()) {
+      return undefined;
+    }
+
+    return subscribeToExtensionState(() => {
+      loadExtensionState()
+        .then((state) => {
+          if (!state) {
+            return;
+          }
+
+          if (JSON.stringify(state.items) !== JSON.stringify(itemsRef.current)) {
+            setItems(state.items);
+          }
+          if (JSON.stringify(state.settings) !== JSON.stringify(settingsRef.current)) {
+            setSettings(state.settings);
+          }
+        })
+        .catch(() => {
+          // The application keeps the currently displayed state if Chrome storage is temporarily unavailable.
+        });
+    });
+  }, [storageReady]);
 
   useEffect(() => {
     const timerId = window.setInterval(() => {
@@ -51,12 +129,44 @@ export default function CooldownApp() {
   }, []);
 
   useEffect(() => {
-    saveStoredItems(items);
-  }, [items]);
+    if (!storageReady) {
+      return;
+    }
+
+    void saveStoredItems(items)
+      .then((saved) => {
+        if (!saved && !persistenceWarningShownRef.current) {
+          persistenceWarningShownRef.current = true;
+          push("Los cambios no se han podido guardar en este navegador.", "error");
+        }
+      })
+      .catch(() => {
+        if (!persistenceWarningShownRef.current) {
+          persistenceWarningShownRef.current = true;
+          push("Los cambios no se han podido guardar en este navegador.", "error");
+        }
+      });
+  }, [items, push, storageReady]);
 
   useEffect(() => {
-    saveStoredSettings(settings);
-  }, [settings]);
+    if (!storageReady) {
+      return;
+    }
+
+    void saveStoredSettings(settings)
+      .then((saved) => {
+        if (!saved && !persistenceWarningShownRef.current) {
+          persistenceWarningShownRef.current = true;
+          push("Los cambios no se han podido guardar en este navegador.", "error");
+        }
+      })
+      .catch(() => {
+        if (!persistenceWarningShownRef.current) {
+          persistenceWarningShownRef.current = true;
+          push("Los cambios no se han podido guardar en este navegador.", "error");
+        }
+      });
+  }, [push, settings, storageReady]);
 
   useEffect(() => {
     const { items: nextItems, completed } = resolveExpiredCooldowns(items, now);
@@ -87,6 +197,26 @@ export default function CooldownApp() {
     [items, filter, query, now],
   );
 
+  const summary = useMemo(() => {
+    const activeItems = items.filter((item) => item.endAt && item.endAt > now);
+    const readyCount = items.length - activeItems.length;
+    const nextReady = activeItems.reduce((closest, item) => {
+      if (!closest || item.endAt < closest.endAt) {
+        return item;
+      }
+
+      return closest;
+    }, null);
+
+    return {
+      total: items.length,
+      active: activeItems.length,
+      ready: readyCount,
+      nextReady,
+      nextReadyRemaining: nextReady ? Math.max(0, nextReady.endAt - now) : 0,
+    };
+  }, [items, now]);
+
   const closeForm = () => {
     setShowForm(false);
     setEditing(null);
@@ -109,7 +239,7 @@ export default function CooldownApp() {
       return;
     }
 
-    commitItem(payload, isEditing ? "Sitio actualizado." : "Sitio anadido.");
+    commitItem(payload, isEditing ? "Sitio actualizado." : "Sitio añadido.");
     closeForm();
   };
 
@@ -137,7 +267,7 @@ export default function CooldownApp() {
           }
         : payload;
 
-    commitItem(nextPayload, "Duracion actualizada.");
+    commitItem(nextPayload, "Duración actualizada.");
     setDurationDecision(null);
   };
 
@@ -160,31 +290,18 @@ export default function CooldownApp() {
     }
   };
 
-  const handleOpenSite = (item) => {
-    const displayName = item.label || hostnameFromUrl(item.url);
-    const chromeApi = typeof window !== "undefined" ? window.chrome : undefined;
-
-    try {
-      if (chromeApi?.tabs?.create) {
-        chromeApi.tabs.create({ url: item.url, active: true }, () => {
-          if (chromeApi.runtime?.lastError) {
-            push(`No se pudo abrir "${displayName}".`, "error");
-            return;
-          }
-          runCooldownAction(startCooldown, item.id);
-        });
-        return;
-      }
-
-      const newWindow = window.open(item.url, "_blank", "noopener,noreferrer");
-      if (!newWindow) {
-        throw new Error("No se pudo abrir la pagina. Revisa los popups.");
-      }
-
-      runCooldownAction(startCooldown, item.id);
-    } catch (error) {
-      push(error.message || `No se pudo abrir "${displayName}".`, "error");
+  const handleOpenSite = (item, event) => {
+    if (isExtensionContext()) {
+      event.preventDefault();
+      globalThis.chrome.runtime.sendMessage({ type: "open-site", siteId: item.id }, (response) => {
+        if (globalThis.chrome.runtime.lastError || !response?.ok) {
+          push(`No se pudo abrir "${item.label || hostnameFromUrl(item.url)}".`, "error");
+        }
+      });
+      return;
     }
+
+    runCooldownAction(startCooldown, item.id);
   };
 
   const handleExport = () => {
@@ -216,40 +333,40 @@ export default function CooldownApp() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 text-slate-900">
-      <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/85 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+    <div className="min-h-screen bg-[#f6f7f9] text-slate-950">
+      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-lg font-semibold text-white shadow-sm">
-              C
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-950 text-sm font-semibold text-white shadow-sm">
+              CT
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">Cooldown Tracker</h1>
-              <p className="text-sm text-slate-500">Gestiona pausas entre visitas y evita volver antes de tiempo.</p>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-950">Cooldown Tracker</h1>
+              <p className="text-sm text-slate-500">Controla pausas entre visitas sin perder contexto.</p>
             </div>
           </div>
 
-          <div className="flex w-full flex-col gap-3 lg:w-auto lg:flex-row lg:items-center">
-            <div className="relative w-full lg:w-80">
+          <div className="flex w-full flex-col gap-2 lg:w-auto lg:flex-row lg:items-center">
+            <div className="relative w-full lg:w-72">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
                 <SearchIcon />
               </div>
               <input
                 type="search"
-                className="block w-full rounded-2xl border border-slate-200 bg-white/90 py-2.5 pl-10 pr-3 text-sm text-slate-700 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                className="block h-10 w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-10 pr-3 text-sm text-slate-700 transition focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
                 placeholder="Buscar sitios..."
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
             </div>
 
-            <div className="inline-flex rounded-2xl bg-slate-100 p-1">
+            <div className="inline-flex rounded-lg bg-slate-100 p-1">
               {FILTER_OPTIONS.map((option) => (
                 <button
                   key={option.value}
                   type="button"
                   onClick={() => setFilter(option.value)}
-                  className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
                     filter === option.value
                       ? "bg-white text-slate-900 shadow-sm"
                       : "text-slate-600 hover:text-slate-900"
@@ -264,9 +381,9 @@ export default function CooldownApp() {
               <button
                 type="button"
                 onClick={() => setShowSettings(true)}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
-                title="Configuracion"
-                aria-label="Abrir configuracion"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950"
+                title="Configuración"
+                aria-label="Abrir configuración"
               >
                 <SettingsIcon />
               </button>
@@ -276,7 +393,7 @@ export default function CooldownApp() {
                   setEditing(null);
                   setShowForm(true);
                 }}
-                className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:from-blue-700 hover:to-indigo-700"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-medium text-white transition hover:bg-slate-800"
               >
                 <PlusIcon />
                 <span>Nuevo sitio</span>
@@ -286,17 +403,41 @@ export default function CooldownApp() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+        <section className="mb-5 grid gap-3 md:grid-cols-4">
+          <SummaryTile label="Sitios guardados" value={summary.total} tone="slate" />
+          <SummaryTile label="En cooldown" value={summary.active} tone="amber" />
+          <SummaryTile label="Listos ahora" value={summary.ready} tone="emerald" />
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Próximo disponible</p>
+            {summary.nextReady ? (
+              <>
+                <p className="mt-2 truncate text-base font-semibold text-slate-950">
+                  {summary.nextReady.label || hostnameFromUrl(summary.nextReady.url)}
+                </p>
+                <p className="mt-1 font-mono text-sm tabular-nums text-slate-500">
+                  {formatClock(summary.nextReadyRemaining)}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="mt-2 text-base font-semibold text-slate-950">Sin esperas</p>
+                <p className="mt-1 text-sm text-slate-500">Todo está listo para visitar.</p>
+              </>
+            )}
+          </div>
+        </section>
+
         {visibleItems.length === 0 ? (
           <EmptyState onAdd={() => setShowForm(true)} />
         ) : (
-          <ul className="grid gap-4 md:grid-cols-2" aria-live="polite">
+          <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" aria-live="polite">
             {visibleItems.map((item) => (
               <li key={item.id}>
                 <SiteCard
                   item={item}
                   now={now}
-                  onOpen={() => handleOpenSite(item)}
+                  onOpen={(event) => handleOpenSite(item, event)}
                   onStart={() => runCooldownAction(startCooldown, item.id, "Cooldown iniciado.")}
                   onReset={() => runCooldownAction(resetCooldown, item.id, "Cooldown reiniciado.")}
                   onClear={() => runCooldownAction(clearCooldown, item.id, "Cooldown limpiado.")}
@@ -313,7 +454,9 @@ export default function CooldownApp() {
       </main>
 
       <footer className="px-4 pb-10 text-center text-xs text-slate-500 sm:px-6">
-        Las notificaciones con la pestana totalmente cerrada requieren Web Push o un backend.
+        {extensionMode
+          ? "La extensión mantiene los avisos aunque cierres esta página."
+          : "Las notificaciones con la pestaña totalmente cerrada requieren Web Push o un backend."}
       </footer>
 
       <ToastViewport toasts={toasts} />
@@ -343,7 +486,7 @@ export default function CooldownApp() {
       {deleteTarget ? (
         <ActionDialog
           title="Eliminar sitio"
-          description={`Se eliminara "${deleteTarget.label || hostnameFromUrl(deleteTarget.url)}" y su estado de cooldown.`}
+          description={`Se eliminará "${deleteTarget.label || hostnameFromUrl(deleteTarget.url)}" y su estado de cooldown.`}
           onClose={() => setDeleteTarget(null)}
           actions={[
             {
@@ -362,8 +505,8 @@ export default function CooldownApp() {
 
       {durationDecision ? (
         <ActionDialog
-          title="Aplicar nueva duracion"
-          description="El sitio sigue en cooldown. Elige si la nueva duracion debe afectar al temporizador actual o solo a visitas futuras."
+          title="Aplicar nueva duración"
+          description="El sitio sigue en cooldown. Elige si la nueva duración debe afectar al temporizador actual o solo a visitas futuras."
           onClose={handleReopenDurationEdit}
           actions={[
             {
@@ -372,7 +515,7 @@ export default function CooldownApp() {
               onSelect: handleReopenDurationEdit,
             },
             {
-              label: "Proxima visita",
+              label: "Próxima visita",
               tone: "secondary",
               onSelect: () => handleDurationDecision("next"),
             },
@@ -384,6 +527,25 @@ export default function CooldownApp() {
           ]}
         />
       ) : null}
+    </div>
+  );
+}
+
+function SummaryTile({ label, value, tone }) {
+  const toneClassName =
+    tone === "amber"
+      ? "bg-amber-50 text-amber-700 ring-amber-100"
+      : tone === "emerald"
+        ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
+        : "bg-slate-100 text-slate-700 ring-slate-200";
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+        <span className={`h-2.5 w-2.5 rounded-full ring-4 ${toneClassName}`} />
+      </div>
+      <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{value}</p>
     </div>
   );
 }
