@@ -5,7 +5,7 @@ export default function FaviconBadge({
   label,
   sizeClassName = "h-12 w-12",
   imageClassName = "h-6 w-6",
-  roundedClassName = "rounded-2xl",
+  roundedClassName = "rounded-lg",
 }) {
   const [showFallback, setShowFallback] = useState(!src);
 

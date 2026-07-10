@@ -2,6 +2,10 @@ export function uid() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+export function isExtensionContext() {
+  return Boolean(globalThis.chrome?.runtime?.id && globalThis.location?.protocol === "chrome-extension:");
+}
+
 export function normalizeUrl(input) {
   try {
     const tentative = String(input || "").trim();
@@ -51,7 +55,7 @@ export function clampMinutes(value, fallback = 1) {
 }
 
 export function buildFaviconUrl(value) {
-  if (!value) {
+  if (!value || isExtensionContext()) {
     return null;
   }
 

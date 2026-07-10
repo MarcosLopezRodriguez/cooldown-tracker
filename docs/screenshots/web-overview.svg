@@ -1,0 +1,47 @@
+<svg width="1280" height="720" viewBox="0 0 1280 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1280" height="720" fill="#EEF2FF"/>
+  <rect x="36" y="28" width="1208" height="664" rx="28" fill="#F8FAFC" stroke="#CBD5E1"/>
+  <rect x="36" y="28" width="1208" height="84" rx="28" fill="#FFFFFF"/>
+  <text x="84" y="82" fill="#0F172A" font-family="Arial, sans-serif" font-size="30" font-weight="700">Cooldown Tracker Web</text>
+  <rect x="82" y="142" width="360" height="54" rx="18" fill="white" stroke="#CBD5E1"/>
+  <text x="112" y="176" fill="#64748B" font-family="Arial, sans-serif" font-size="20">Buscar sitios...</text>
+  <rect x="466" y="142" width="270" height="54" rx="18" fill="#E2E8F0"/>
+  <rect x="472" y="148" width="86" height="42" rx="14" fill="white"/>
+  <text x="496" y="175" fill="#0F172A" font-family="Arial, sans-serif" font-size="18" font-weight="700">Todos</text>
+  <text x="580" y="175" fill="#475569" font-family="Arial, sans-serif" font-size="18">Cooldown</text>
+  <text x="680" y="175" fill="#475569" font-family="Arial, sans-serif" font-size="18">Listos</text>
+  <rect x="1084" y="142" width="110" height="54" rx="18" fill="#2563EB"/>
+  <text x="1108" y="175" fill="white" font-family="Arial, sans-serif" font-size="18" font-weight="700">+ Nuevo</text>
+
+  <rect x="82" y="236" width="520" height="188" rx="26" fill="white" stroke="#CBD5E1"/>
+  <rect x="82" y="236" width="8" height="188" rx="4" fill="#F59E0B"/>
+  <text x="124" y="286" fill="#0F172A" font-family="Arial, sans-serif" font-size="28" font-weight="700">reddit.com</text>
+  <rect x="344" y="258" width="118" height="30" rx="15" fill="#FEF3C7"/>
+  <text x="368" y="278" fill="#92400E" font-family="Arial, sans-serif" font-size="16" font-weight="700">En cooldown</text>
+  <text x="124" y="326" fill="#64748B" font-family="Arial, sans-serif" font-size="18">Dominio completo - 00:19:20</text>
+  <rect x="124" y="352" width="400" height="12" rx="6" fill="#E2E8F0"/>
+  <rect x="124" y="352" width="290" height="12" rx="6" fill="#3B82F6"/>
+  <rect x="124" y="382" width="88" height="36" rx="16" fill="#DBEAFE"/>
+  <text x="149" y="405" fill="#1D4ED8" font-family="Arial, sans-serif" font-size="16" font-weight="700">Abrir</text>
+  <rect x="224" y="382" width="144" height="36" rx="16" fill="white" stroke="#CBD5E1"/>
+  <text x="245" y="405" fill="#334155" font-family="Arial, sans-serif" font-size="16" font-weight="700">Marcar visitado</text>
+  <rect x="380" y="382" width="96" height="36" rx="16" fill="white" stroke="#CBD5E1"/>
+  <text x="405" y="405" fill="#334155" font-family="Arial, sans-serif" font-size="16" font-weight="700">Reiniciar</text>
+
+  <rect x="640" y="236" width="520" height="188" rx="26" fill="white" stroke="#CBD5E1"/>
+  <rect x="640" y="236" width="8" height="188" rx="4" fill="#10B981"/>
+  <text x="682" y="286" fill="#0F172A" font-family="Arial, sans-serif" font-size="28" font-weight="700">youtube.com</text>
+  <rect x="966" y="258" width="76" height="30" rx="15" fill="#DCFCE7"/>
+  <text x="986" y="278" fill="#166534" font-family="Arial, sans-serif" font-size="16" font-weight="700">Listo</text>
+  <text x="682" y="326" fill="#64748B" font-family="Arial, sans-serif" font-size="18">URL exacta - sin cooldown activo</text>
+  <rect x="682" y="382" width="88" height="36" rx="16" fill="#DBEAFE"/>
+  <text x="707" y="405" fill="#1D4ED8" font-family="Arial, sans-serif" font-size="16" font-weight="700">Abrir</text>
+  <rect x="782" y="382" width="144" height="36" rx="16" fill="white" stroke="#CBD5E1"/>
+  <text x="803" y="405" fill="#334155" font-family="Arial, sans-serif" font-size="16" font-weight="700">Marcar visitado</text>
+
+  <rect x="82" y="458" width="1078" height="180" rx="28" fill="#0F172A"/>
+  <text x="122" y="512" fill="white" font-family="Arial, sans-serif" font-size="28" font-weight="700">La idea de esta rama</text>
+  <text x="122" y="556" fill="#CBD5E1" font-family="Arial, sans-serif" font-size="22">App web directa, sin manifest ni runtime de extension</text>
+  <text x="122" y="592" fill="#CBD5E1" font-family="Arial, sans-serif" font-size="22">Ideal para usar en local o desplegar como sitio estatico</text>
+  <text x="122" y="628" fill="#CBD5E1" font-family="Arial, sans-serif" font-size="22">Toda la interaccion vive en la propia pagina</text>
+</svg>

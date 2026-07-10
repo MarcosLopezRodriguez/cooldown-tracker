@@ -2,20 +2,20 @@ import React from "react";
 
 export default function EmptyState({ onAdd }) {
   return (
-    <div className="mt-20 rounded-[2rem] border border-dashed border-slate-200 bg-white/80 px-6 py-14 text-center shadow-sm">
-      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-slate-500">
+    <div className="mt-12 rounded-lg border border-dashed border-slate-300 bg-white px-6 py-14 text-center shadow-sm">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
         <HourglassIcon />
       </div>
-      <h2 className="mt-6 text-2xl font-semibold text-slate-900">Aun no hay sitios</h2>
+      <h2 className="mt-6 text-2xl font-semibold text-slate-950">Aún no hay sitios</h2>
       <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-500">
-        Anade webs que visitas con frecuencia para crear cooldowns personalizados y decidir cuando puedes volver.
+        Añade webs que visitas con frecuencia para crear cooldowns personalizados y decidir cuándo puedes volver.
       </p>
       <button
         type="button"
         onClick={onAdd}
-        className="mt-6 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
+        className="mt-6 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
       >
-        Anadir primer sitio
+        Añadir primer sitio
       </button>
     </div>
   );

@@ -16,7 +16,7 @@ export default function DurationInput({ minutes, onChangeMinutes, inputId = "dur
           id={inputId}
           type="number"
           min={1}
-          className="w-28 rounded-2xl border border-slate-300 px-3 py-2.5 text-sm shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          className="w-28 rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
           value={value}
           onChange={(event) => setValue(event.target.value)}
           onBlur={() => {
@@ -36,7 +36,7 @@ export default function DurationInput({ minutes, onChangeMinutes, inputId = "dur
               onClick={() => onChangeMinutes(preset)}
               className={`rounded-xl px-3 py-1.5 text-sm font-medium transition ${
                 selected
-                  ? "border border-blue-200 bg-blue-100 text-blue-700"
+                  ? "border border-slate-300 bg-slate-950 text-white"
                   : "bg-slate-100 text-slate-700 hover:bg-slate-200"
               }`}
             >

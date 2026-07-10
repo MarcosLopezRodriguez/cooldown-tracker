@@ -2,8 +2,9 @@
   "manifest_version": 3,
   "name": "Cooldown Tracker",
   "version": "1.0.0",
-  "description": "Gestiona cooldowns entre visitas y abre la app en una pestana de extension.",
-  "permissions": ["tabs"],
+  "description": "Controla pausas entre visitas y bloquea sitios durante el cooldown.",
+  "permissions": ["alarms", "notifications", "storage", "tabs", "webNavigation"],
+  "host_permissions": ["http://*/*", "https://*/*"],
   "action": {
     "default_title": "Abrir Cooldown Tracker"
   },

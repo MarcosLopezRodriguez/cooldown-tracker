@@ -17,7 +17,7 @@ export default function ToastViewport({ toasts }) {
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className={`pointer-events-auto rounded-2xl border px-4 py-3 text-sm shadow-lg ${toneClassName(toast.tone)}`}
+          className={`pointer-events-auto rounded-lg border px-4 py-3 text-sm shadow-lg ${toneClassName(toast.tone)}`}
         >
           {toast.message}
         </div>
