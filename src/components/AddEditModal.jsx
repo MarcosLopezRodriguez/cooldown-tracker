@@ -87,6 +87,7 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
       titleId="site-modal-title"
       descriptionId="site-modal-description"
       onClose={onClose}
+      initialFocusRef={inputRef}
       panelClassName="overflow-hidden"
     >
       <div className="border-b border-slate-100 px-6 py-5">
