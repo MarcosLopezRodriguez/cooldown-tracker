@@ -206,7 +206,7 @@ export function resetCooldown(items, id, now = Date.now()) {
       ? {
           ...item,
           mode: SITE_MODES.COOLDOWN,
-          lastVisitedAt: item.lastVisitedAt ?? now,
+          lastVisitedAt: now,
           endAt: now + item.durationMs,
           updatedAt: now,
         }
