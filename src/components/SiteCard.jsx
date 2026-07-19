@@ -2,6 +2,7 @@ import React from "react";
 import FaviconBadge from "./FaviconBadge.jsx";
 import { formatClock } from "../lib/utils.js";
 import { getSiteView } from "../lib/sites.js";
+import { useI18n } from "../i18n/I18nContext.jsx";
 
 export default function SiteCard({
   item,
@@ -15,9 +16,10 @@ export default function SiteCard({
   onEdit,
   onDelete,
 }) {
+  const { t } = useI18n();
   const view = getSiteView(item, now);
-  const statusText = view.permanent ? "Siempre" : view.ready ? "Libre" : formatClock(view.remaining);
-  const statusLabel = view.permanent ? "Permanente" : view.ready ? "Libre" : "En cooldown";
+  const statusText = view.permanent ? t("always") : view.ready ? t("free") : formatClock(view.remaining);
+  const statusLabel = view.permanent ? t("permanent") : view.ready ? t("free") : t("inCooldown");
   const statusClassName = view.permanent
     ? "bg-rose-50 text-rose-700"
     : view.ready
@@ -57,7 +59,7 @@ export default function SiteCard({
             {!view.ready && !view.permanent ? (
               <div className="mt-4 space-y-1.5">
                 <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span>Progreso</span>
+                  <span>{t("progress")}</span>
                   <span>{view.progress}%</span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-slate-100">
@@ -80,7 +82,7 @@ export default function SiteCard({
             className="inline-flex h-8 items-center gap-1.5 rounded-md bg-slate-950 px-3 text-sm font-medium text-white transition hover:bg-slate-800"
           >
             <PlayIcon />
-            {view.permanent ? "Abrir una vez" : "Abrir"}
+            {view.permanent ? t("openOnce") : t("open")}
           </a>
           {!view.permanent && view.ready ? (
             <button
@@ -89,7 +91,7 @@ export default function SiteCard({
               className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
             >
               <ClockIcon />
-              {extensionMode ? "Bloquear ahora" : "Marcar visitado"}
+              {extensionMode ? t("blockNow") : t("markVisited")}
             </button>
           ) : null}
 
@@ -101,14 +103,14 @@ export default function SiteCard({
                 className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
               >
                 <RefreshIcon />
-                Reiniciar tiempo
+                {t("restartTime")}
               </button>
               <button
                 type="button"
                 onClick={onClear}
                 className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
               >
-                Liberar
+                {t("release")}
               </button>
             </>
           ) : null}
@@ -120,7 +122,7 @@ export default function SiteCard({
               className="inline-flex h-8 items-center gap-1.5 rounded-md border border-rose-200 px-3 text-sm font-medium text-rose-700 transition hover:border-rose-300 hover:bg-rose-50"
             >
               <ShieldIcon />
-              Permanente
+              {t("makePermanent")}
             </button>
           ) : null}
 
@@ -130,7 +132,7 @@ export default function SiteCard({
               onClick={onClear}
               className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
             >
-              Desbloquear
+              {t("unblock")}
             </button>
           ) : null}
 
@@ -139,8 +141,8 @@ export default function SiteCard({
               type="button"
               onClick={onEdit}
               className="rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-              title="Editar"
-              aria-label="Editar sitio"
+              title={t("editSite")}
+              aria-label={t("editSite")}
             >
               <EditIcon />
             </button>
@@ -148,8 +150,8 @@ export default function SiteCard({
               type="button"
               onClick={onDelete}
               className="rounded-md p-2 text-rose-500 transition hover:bg-rose-50 hover:text-rose-600"
-              title="Eliminar"
-              aria-label="Eliminar sitio"
+              title={t("delete")}
+              aria-label={t("deleteSite")}
             >
               <DeleteIcon />
             </button>

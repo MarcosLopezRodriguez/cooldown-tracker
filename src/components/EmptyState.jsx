@@ -1,6 +1,8 @@
 import React from "react";
+import { useI18n } from "../i18n/I18nContext.jsx";
 
 export default function EmptyState({ onAdd, extensionMode = false }) {
+  const { t } = useI18n();
   return (
     <div
       className={`rounded-lg border border-dashed border-slate-300 bg-white px-6 text-center shadow-sm ${
@@ -11,17 +13,17 @@ export default function EmptyState({ onAdd, extensionMode = false }) {
         <HourglassIcon />
       </div>
       <h2 className={`${extensionMode ? "mt-4 text-lg" : "mt-6 text-2xl"} font-semibold text-slate-950`}>
-        Aún no hay sitios
+        {t("noSites")}
       </h2>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
-        Añade webs que visitas con frecuencia para crear cooldowns personalizados y decidir cuándo puedes volver.
+        {t("noSitesDescription")}
       </p>
       <button
         type="button"
         onClick={onAdd}
         className="mt-5 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
       >
-        Añadir primer sitio
+        {t("addFirstSite")}
       </button>
     </div>
   );

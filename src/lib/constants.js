@@ -12,6 +12,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   notificationsOn: false,
   soundOn: true,
   privacyAccepted: false,
+  language: "auto",
 });
 
 export const FILTER_OPTIONS = [

@@ -31,6 +31,8 @@ import {
 import { downloadJsonFile, formatClock, hostnameFromUrl, isExtensionContext, normalizeUrl } from "./lib/utils.js";
 import { useNotificationCenter } from "./hooks/useNotificationCenter.js";
 import { useToasts } from "./hooks/useToasts.js";
+import { createTranslator, resolveLocale } from "../extension/i18n.js";
+import { I18nProvider, useI18n } from "./i18n/I18nContext.jsx";
 
 export default function CooldownApp() {
   const initialNowRef = useRef(Date.now());
@@ -39,6 +41,8 @@ export default function CooldownApp() {
   const [now, setNow] = useState(initialNow);
   const [items, setItems] = useState(() => loadStoredItems(initialNow));
   const [settings, setSettings] = useState(() => loadStoredSettings());
+  const locale = useMemo(() => resolveLocale(settings.language), [settings.language]);
+  const t = useMemo(() => createTranslator(locale), [locale]);
   const [storageReady, setStorageReady] = useState(() => !usesExtensionStorage());
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
@@ -53,11 +57,17 @@ export default function CooldownApp() {
     notificationsOn: settings.notificationsOn,
     soundOn: settings.soundOn,
     push,
+    t,
   });
   const notifiedRef = useRef(new Set());
   const itemsRef = useRef(items);
   const settingsRef = useRef(settings);
+  const tRef = useRef(t);
   const persistenceWarningShownRef = useRef(false);
+
+  useEffect(() => {
+    document.documentElement.lang = locale === "zh" ? "zh-CN" : locale;
+  }, [locale]);
 
   useEffect(() => {
     itemsRef.current = items;
@@ -66,6 +76,10 @@ export default function CooldownApp() {
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
+
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
 
   useEffect(() => {
     if (!usesExtensionStorage()) {
@@ -84,7 +98,7 @@ export default function CooldownApp() {
       })
       .catch(() => {
         if (!cancelled) {
-          push("No se pudieron cargar los datos de la extensión.", "error");
+          push(tRef.current("storageLoadError"), "error");
         }
       })
       .finally(() => {
@@ -165,16 +179,16 @@ export default function CooldownApp() {
       .then((saved) => {
         if (!saved && !persistenceWarningShownRef.current) {
           persistenceWarningShownRef.current = true;
-          push("Los cambios no se han podido guardar en este navegador.", "error");
+          push(t("storageSaveError"), "error");
         }
       })
       .catch(() => {
         if (!persistenceWarningShownRef.current) {
           persistenceWarningShownRef.current = true;
-          push("Los cambios no se han podido guardar en este navegador.", "error");
+          push(t("storageSaveError"), "error");
         }
       });
-  }, [items, push, storageReady]);
+  }, [items, push, storageReady, t]);
 
   useEffect(() => {
     if (!storageReady) {
@@ -185,16 +199,16 @@ export default function CooldownApp() {
       .then((saved) => {
         if (!saved && !persistenceWarningShownRef.current) {
           persistenceWarningShownRef.current = true;
-          push("Los cambios no se han podido guardar en este navegador.", "error");
+          push(t("storageSaveError"), "error");
         }
       })
       .catch(() => {
         if (!persistenceWarningShownRef.current) {
           persistenceWarningShownRef.current = true;
-          push("Los cambios no se han podido guardar en este navegador.", "error");
+          push(t("storageSaveError"), "error");
         }
       });
-  }, [push, settings, storageReady]);
+  }, [push, settings, storageReady, t]);
 
   useEffect(() => {
     const { items: nextItems, completed } = resolveExpiredCooldowns(items, now);
@@ -211,9 +225,9 @@ export default function CooldownApp() {
 
       notifiedRef.current.add(key);
       notifyReady(item);
-      push(`"${item.label || hostnameFromUrl(item.url)}" ya se puede visitar.`, "success");
+      push(t("readyToast", { name: item.label || hostnameFromUrl(item.url) }), "success");
     });
-  }, [items, now, notifyReady, push]);
+  }, [items, now, notifyReady, push, t]);
 
   const visibleItems = useMemo(
     () =>
@@ -288,7 +302,7 @@ export default function CooldownApp() {
           lastVisitedAt: stamp,
           endAt: stamp + payload.durationMs,
         },
-        "Sitio añadido y bloqueo activado.",
+        t("siteAddedBlocked"),
         stamp,
       );
       closeForm();
@@ -298,10 +312,10 @@ export default function CooldownApp() {
     commitItem(
       payload,
       isEditing
-        ? "Sitio actualizado."
+        ? t("siteUpdated")
         : payload.mode === SITE_MODES.ALWAYS
-          ? "Sitio añadido y bloqueo permanente activado."
-          : "Sitio añadido.",
+          ? t("siteAddedPermanent")
+          : t("siteAdded"),
     );
     closeForm();
   };
@@ -312,7 +326,7 @@ export default function CooldownApp() {
     }
 
     setItems((currentItems) => removeSite(currentItems, deleteTarget.id));
-    push(`"${deleteTarget.label || hostnameFromUrl(deleteTarget.url)}" eliminado.`, "success");
+    push(t("siteDeleted", { name: deleteTarget.label || hostnameFromUrl(deleteTarget.url) }), "success");
     setDeleteTarget(null);
   };
 
@@ -330,7 +344,7 @@ export default function CooldownApp() {
           }
         : payload;
 
-    commitItem(nextPayload, "Duración actualizada.");
+    commitItem(nextPayload, t("durationUpdated"));
     setDurationDecision(null);
   };
 
@@ -358,7 +372,7 @@ export default function CooldownApp() {
       event.preventDefault();
       globalThis.chrome.runtime.sendMessage({ type: "open-site", siteId: item.id }, (response) => {
         if (globalThis.chrome.runtime.lastError || !response?.ok) {
-          push(`No se pudo abrir "${item.label || hostnameFromUrl(item.url)}".`, "error");
+          push(t("openError", { name: item.label || hostnameFromUrl(item.url) }), "error");
         }
       });
       return;
@@ -369,7 +383,7 @@ export default function CooldownApp() {
 
   const handleBlockActiveTab = () => {
     if (!activeTab?.url) {
-      push("No hay una pestaña web activa para bloquear.", "error");
+      push(t("noTabError"), "error");
       return;
     }
 
@@ -397,13 +411,13 @@ export default function CooldownApp() {
         stamp,
       );
     });
-    push(`"${host}" bloqueado de forma permanente.`, "success");
+    push(t("permanentlyBlockedToast", { name: host }), "success");
   };
 
   const handleExport = () => {
     const payload = buildExportPayload(items, settings);
     downloadJsonFile("cooldown-data.json", JSON.stringify(payload, null, 2));
-    push("Datos exportados.", "success");
+    push(t("exported"), "success");
   };
 
   const handleImport = async (file) => {
@@ -415,6 +429,7 @@ export default function CooldownApp() {
     const parsed = parseImportPayload(text, {
       now,
       fallbackSettings: settings,
+      translate: t,
     });
 
     if (parsed.hasItems) {
@@ -425,13 +440,14 @@ export default function CooldownApp() {
       setSettings(parsed.settings);
     }
 
-    push("Datos importados.", "success");
+    push(t("imported"), "success");
   };
 
   return (
-    <div
-      className={`cooldown-app min-h-screen bg-[#f4f7f6] text-slate-950 ${extensionMode ? "extension-shell" : ""}`}
-    >
+    <I18nProvider locale={locale}>
+      <div
+        className={`cooldown-app min-h-screen bg-[#f4f7f6] text-slate-950 ${extensionMode ? "extension-shell" : ""}`}
+      >
       <header className="app-header sticky top-0 z-20 border-b border-slate-200/80 bg-white/95 backdrop-blur">
         <div
           className={`mx-auto flex max-w-7xl flex-col gap-4 px-4 py-3 sm:px-6 ${
@@ -444,7 +460,7 @@ export default function CooldownApp() {
             </div>
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-lg font-semibold text-slate-950">Cooldown Tracker</h1>
-              <p className="truncate text-xs text-slate-500">Decide cuándo volver, antes de volver por impulso.</p>
+              <p className="truncate text-xs text-slate-500">{t("appTagline")}</p>
             </div>
 
             {extensionMode ? (
@@ -453,8 +469,8 @@ export default function CooldownApp() {
                   type="button"
                   onClick={() => setShowSettings(true)}
                   className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950"
-                  title="Configuración"
-                  aria-label="Abrir configuración"
+                  title={t("settings")}
+                  aria-label={t("openSettings")}
                 >
                   <SettingsIcon />
                 </button>
@@ -467,7 +483,7 @@ export default function CooldownApp() {
                   className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-slate-950 px-3 text-xs font-semibold text-white transition hover:bg-slate-800"
                 >
                   <PlusIcon />
-                  <span>Nuevo sitio</span>
+                  <span>{t("newSite")}</span>
                 </button>
               </div>
             ) : null}
@@ -483,7 +499,7 @@ export default function CooldownApp() {
               <input
                 type="search"
                 className="block h-10 w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-10 pr-3 text-sm text-slate-700 transition focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
-                placeholder="Buscar sitios..."
+                placeholder={t("searchSites")}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
@@ -502,7 +518,7 @@ export default function CooldownApp() {
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
-                  {option.label}
+                  {t(option.value === "all" ? "filterAll" : option.value === "active" ? "filterBlocked" : "filterFree")}
                 </button>
               ))}
             </div>
@@ -512,8 +528,8 @@ export default function CooldownApp() {
                 type="button"
                 onClick={() => setShowSettings(true)}
                 className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950"
-                title="Configuración"
-                aria-label="Abrir configuración"
+                title={t("settings")}
+                aria-label={t("openSettings")}
               >
                 <SettingsIcon />
               </button>
@@ -526,7 +542,7 @@ export default function CooldownApp() {
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-medium text-white transition hover:bg-slate-800"
               >
                 <PlusIcon />
-                <span>Nuevo sitio</span>
+                <span>{t("newSite")}</span>
               </button>
             </div> : null}
           </div>
@@ -542,11 +558,11 @@ export default function CooldownApp() {
           <ExtensionSummary summary={summary} />
         ) : (
           <section className="mb-5 grid gap-3 md:grid-cols-4">
-            <SummaryTile label="Sitios guardados" value={summary.total} tone="slate" />
-            <SummaryTile label="Bloqueados" value={summary.active} tone="amber" />
-            <SummaryTile label="Libres ahora" value={summary.ready} tone="emerald" />
+            <SummaryTile label={t("savedSites")} value={summary.total} tone="slate" />
+            <SummaryTile label={t("filterBlocked")} value={summary.active} tone="amber" />
+            <SummaryTile label={t("available")} value={summary.ready} tone="emerald" />
             <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Próximo disponible</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{t("nextAvailable")}</p>
               {summary.nextReady ? (
                 <>
                   <p className="mt-2 truncate text-base font-semibold text-slate-950">
@@ -558,8 +574,8 @@ export default function CooldownApp() {
                 </>
               ) : (
                 <>
-                  <p className="mt-2 text-base font-semibold text-slate-950">Sin esperas</p>
-                  <p className="mt-1 text-sm text-slate-500">Todo está listo para visitar.</p>
+                  <p className="mt-2 text-base font-semibold text-slate-950">{t("noWait")}</p>
+                  <p className="mt-1 text-sm text-slate-500">{t("allReady")}</p>
                 </>
               )}
             </div>
@@ -584,18 +600,18 @@ export default function CooldownApp() {
                     runCooldownAction(
                       startCooldown,
                       item.id,
-                      extensionMode ? "Bloqueo activado." : "Cooldown iniciado.",
+                      extensionMode ? t("blockActivated") : t("cooldownStarted"),
                     )
                   }
-                  onReset={() => runCooldownAction(resetCooldown, item.id, "Cooldown reiniciado.")}
+                  onReset={() => runCooldownAction(resetCooldown, item.id, t("cooldownRestarted"))}
                   onClear={() =>
                     runCooldownAction(
                       clearCooldown,
                       item.id,
-                      item.mode === SITE_MODES.ALWAYS ? "Bloqueo desactivado." : "Cooldown limpiado.",
+                      item.mode === SITE_MODES.ALWAYS ? t("blockReleased") : t("cooldownReleased"),
                     )
                   }
-                  onMakePermanent={() => runCooldownAction(setPermanentBlock, item.id, "Bloqueo permanente activado.")}
+                  onMakePermanent={() => runCooldownAction(setPermanentBlock, item.id, t("permanentActivated"))}
                   onEdit={() => {
                     setEditing(item);
                     setShowForm(true);
@@ -612,10 +628,10 @@ export default function CooldownApp() {
         {extensionMode ? (
           <span className="inline-flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.12)]" />
-            Protección activa aunque cierres este popup
+            {t("protectionActive")}
           </span>
         ) : (
-          "Las notificaciones con la pestaña totalmente cerrada requieren Web Push o un backend."
+          t("webPushNote")
         )}
       </footer>
 
@@ -656,17 +672,17 @@ export default function CooldownApp() {
 
       {deleteTarget ? (
         <ActionDialog
-          title="Eliminar sitio"
-          description={`Se eliminará "${deleteTarget.label || hostnameFromUrl(deleteTarget.url)}" y su estado de cooldown.`}
+          title={t("deleteSite")}
+          description={t("deleteDescription", { name: deleteTarget.label || hostnameFromUrl(deleteTarget.url) })}
           onClose={() => setDeleteTarget(null)}
           actions={[
             {
-              label: "Cancelar",
+              label: t("cancel"),
               tone: "secondary",
               onSelect: () => setDeleteTarget(null),
             },
             {
-              label: "Eliminar",
+              label: t("delete"),
               tone: "danger",
               onSelect: handleDeleteConfirmed,
             },
@@ -676,33 +692,35 @@ export default function CooldownApp() {
 
       {durationDecision ? (
         <ActionDialog
-          title="Aplicar nueva duración"
-          description="El sitio sigue en cooldown. Elige si la nueva duración debe afectar al temporizador actual o solo a visitas futuras."
+          title={t("durationTitle")}
+          description={t("durationDescription")}
           onClose={handleReopenDurationEdit}
           actions={[
             {
-              label: "Seguir editando",
+              label: t("keepEditing"),
               tone: "secondary",
               onSelect: handleReopenDurationEdit,
             },
             {
-              label: "Próxima visita",
+              label: t("nextVisit"),
               tone: "secondary",
               onSelect: () => handleDurationDecision("next"),
             },
             {
-              label: "Aplicar ahora",
+              label: t("applyNow"),
               tone: "primary",
               onSelect: () => handleDurationDecision("now"),
             },
           ]}
         />
       ) : null}
-    </div>
+      </div>
+    </I18nProvider>
   );
 }
 
 function ActiveTabQuickBlock({ activeTab, existingSite, onBlock }) {
+  const { t } = useI18n();
   const host = activeTab?.url ? hostnameFromUrl(activeTab.url) : "";
   const alreadyPermanent = existingSite?.mode === SITE_MODES.ALWAYS;
 
@@ -713,12 +731,12 @@ function ActiveTabQuickBlock({ activeTab, existingSite, onBlock }) {
           <GlobeIcon />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase text-slate-500">Pestaña activa</p>
+          <p className="text-[11px] font-semibold uppercase text-slate-500">{t("activeTab")}</p>
           <p className="mt-0.5 truncate text-sm font-semibold text-slate-950">
-            {host || "Sin pestaña web activa"}
+            {host || t("noActiveTab")}
           </p>
           <p className="mt-0.5 truncate text-xs text-slate-500">
-            {activeTab?.title || activeTab?.url || "Abre una página http o https para capturarla."}
+            {activeTab?.title || activeTab?.url || t("activeTabHint")}
           </p>
         </div>
 
@@ -733,7 +751,7 @@ function ActiveTabQuickBlock({ activeTab, existingSite, onBlock }) {
           }`}
         >
           <ShieldIcon />
-          {alreadyPermanent ? "Ya bloqueada" : "Bloquear pestaña"}
+          {alreadyPermanent ? t("alreadyBlocked") : t("blockTab")}
         </button>
       </div>
     </section>
@@ -741,24 +759,25 @@ function ActiveTabQuickBlock({ activeTab, existingSite, onBlock }) {
 }
 
 function ExtensionSummary({ summary }) {
+  const { t } = useI18n();
   return (
     <section className="mb-3 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="grid grid-cols-3 divide-x divide-slate-100">
-        <CompactMetric label="Guardados" value={summary.total} />
-        <CompactMetric label="Bloqueados" value={summary.active} tone="rose" />
-        <CompactMetric label="Disponibles" value={summary.ready} tone="emerald" />
+        <CompactMetric label={t("savedSites")} value={summary.total} />
+        <CompactMetric label={t("filterBlocked")} value={summary.active} tone="rose" />
+        <CompactMetric label={t("available")} value={summary.ready} tone="emerald" />
       </div>
       <div className="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/80 px-3.5 py-2.5">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase text-slate-500">Próximo disponible</p>
+          <p className="text-[11px] font-semibold uppercase text-slate-500">{t("nextAvailable")}</p>
           <p className="mt-0.5 truncate text-xs font-medium text-slate-700">
             {summary.nextReady
               ? summary.nextReady.label || hostnameFromUrl(summary.nextReady.url)
-              : "Todo listo para visitar"}
+              : t("allReady")}
           </p>
         </div>
         <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-slate-800">
-          {summary.nextReady ? formatClock(summary.nextReadyRemaining) : "Sin esperas"}
+          {summary.nextReady ? formatClock(summary.nextReadyRemaining) : t("noWait")}
         </span>
       </div>
     </section>

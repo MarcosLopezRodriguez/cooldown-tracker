@@ -25,13 +25,13 @@ async function ensurePermission() {
   }
 }
 
-function showBrowserNotification(item) {
+function showBrowserNotification(item, t) {
   if (!canNotify() || Notification.permission !== "granted") {
     return;
   }
 
-  const notification = new Notification(`Listo para visitar: ${item.label || hostnameFromUrl(item.url)}`, {
-    body: "El cooldown ha terminado.",
+  const notification = new Notification(t("notificationTitle", { name: item.label || hostnameFromUrl(item.url) }), {
+    body: t("notificationBody"),
     icon: item.favicon || buildFaviconUrl(item.url),
     tag: `cooldown-${item.id}-${Date.now()}`,
   });
@@ -41,7 +41,7 @@ function showBrowserNotification(item) {
   }, 5000);
 }
 
-export function useNotificationCenter({ notificationsOn, soundOn, push }) {
+export function useNotificationCenter({ notificationsOn, soundOn, push, t }) {
   const supported = canNotify();
   const [permission, setPermission] = useState(() => (supported ? Notification.permission : "denied"));
   const audioContextRef = useRef(null);
@@ -75,21 +75,21 @@ export function useNotificationCenter({ notificationsOn, soundOn, push }) {
   const notifyReady = useCallback(
     (item) => {
       if (notificationsOn && permission === "granted") {
-        showBrowserNotification(item);
+        showBrowserNotification(item, t);
       }
       playBeep();
     },
-    [notificationsOn, permission, playBeep],
+    [notificationsOn, permission, playBeep, t],
   );
 
   const toggleNotifications = useCallback(async () => {
     if (!supported) {
-      push("Este navegador no soporta notificaciones.", "error");
+      push(t("notificationUnsupported"), "error");
       return false;
     }
 
     if (notificationsOn) {
-      push("Notificaciones desactivadas.", "success");
+      push(t("notificationsDisabled"), "success");
       return false;
     }
 
@@ -97,13 +97,13 @@ export function useNotificationCenter({ notificationsOn, soundOn, push }) {
     setPermission(nextPermission);
 
     if (nextPermission === "granted") {
-      push("Notificaciones activadas.", "success");
+      push(t("notificationsEnabled"), "success");
       return true;
     }
 
-    push("Permiso de notificaciones denegado.", "error");
+    push(t("notificationPermissionDenied"), "error");
     return false;
-  }, [notificationsOn, push, supported]);
+  }, [notificationsOn, push, supported, t]);
 
   return {
     supported,

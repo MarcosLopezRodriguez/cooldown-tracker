@@ -1,5 +1,6 @@
 import React from "react";
 import DialogShell from "./DialogShell.jsx";
+import { useI18n } from "../i18n/I18nContext.jsx";
 
 function toneClassName(tone) {
   switch (tone) {
@@ -13,6 +14,7 @@ function toneClassName(tone) {
 }
 
 export default function ActionDialog({ title, description, actions, onClose }) {
+  const { t } = useI18n();
   return (
     <DialogShell titleId="action-dialog-title" descriptionId="action-dialog-description" onClose={onClose}>
       <div className="border-b border-slate-100 px-6 py-5">
@@ -29,7 +31,7 @@ export default function ActionDialog({ title, description, actions, onClose }) {
             type="button"
             onClick={onClose}
             className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-            aria-label="Cerrar diálogo"
+            aria-label={t("closeDialog")}
           >
             <CloseIcon />
           </button>

@@ -10,6 +10,7 @@ Cooldown Tracker registra pausas entre visitas a sitios frecuentes. Puede usarse
 - Exporta e importa datos en JSON versionado.
 - Muestra avisos y sonido mientras la aplicación está abierta.
 - En la extensión de Chrome, bloquea la navegación de sitios en cooldown o con bloqueo permanente y avisa incluso si la página de la aplicación está cerrada.
+- Incluye español, inglés, francés, alemán, italiano, polaco, chino y ruso. El modo `Automático` sigue el idioma de Chrome y también puede cambiarse manualmente desde la configuración.
 
 ## Aplicación web
 
@@ -40,6 +41,8 @@ Después, en Chrome abre `chrome://extensions`, activa el modo de desarrollador 
 No cargues la carpeta `public` ni la raíz del proyecto como extensión: esas carpetas no contienen la aplicación empaquetada. Si Chrome muestra `ERR_FILE_NOT_FOUND` al pulsar el icono de la barra, elimina esa carga anterior y vuelve a cargar `dist`.
 
 La extensión solicita acceso a páginas `http` y `https` para poder detectar y redirigir una navegación cuando exista un cooldown activo o un bloqueo permanente. Los datos se almacenan localmente en Chrome mediante `chrome.storage`.
+
+El nombre, la descripción y el título del botón de la extensión usan los catálogos nativos de Chrome en `extension/_locales`. La interfaz, las notificaciones y la pantalla de bloqueo respetan la misma preferencia de idioma guardada por el usuario.
 
 Al abrir un sitio desde la extensión, esa visita queda permitida y reinicia su cooldown. A partir de ahí:
 

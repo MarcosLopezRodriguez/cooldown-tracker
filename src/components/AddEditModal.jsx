@@ -4,8 +4,10 @@ import DurationInput from "./DurationInput.jsx";
 import FaviconBadge from "./FaviconBadge.jsx";
 import { SITE_MODES } from "../lib/constants.js";
 import { buildFaviconUrl, clampMinutes, hostnameFromUrl, isExtensionContext, normalizeUrl } from "../lib/utils.js";
+import { useI18n } from "../i18n/I18nContext.jsx";
 
 export default function AddEditModal({ initial, defaultDurationMs, onClose, onSave }) {
+  const { t } = useI18n();
   const inputRef = useRef(null);
   const closeButtonRef = useRef(null);
   const extensionMode = isExtensionContext();
@@ -49,7 +51,7 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
     const safeMinutes = clampMinutes(minutes, Math.max(1, Math.round(defaultDurationMs / 60_000)));
     const safeUrl = normalizeUrl(url);
     if (!safeUrl) {
-      setFormError("Introduce una URL válida.");
+      setFormError(t("invalidUrl"));
       return;
     }
 
@@ -74,7 +76,7 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
         createdAt: initial?.createdAt ?? now,
       });
     } catch (error) {
-      setFormError(error.message || "No se pudo guardar el sitio.");
+      setFormError(error.message || t("saveError"));
       setIsSubmitting(false);
       return;
     }
@@ -94,12 +96,10 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 id="site-modal-title" className="text-xl font-semibold text-slate-900">
-              {initial ? "Editar sitio" : "Añadir nuevo sitio"}
+              {initial ? t("editSite") : t("addSite")}
             </h2>
             <p id="site-modal-description" className="mt-1 text-sm text-slate-500">
-              {initial
-                ? "Actualiza el sitio y su configuración de bloqueo."
-                : "Define la URL, el nombre visible y cómo debe bloquearse."}
+              {initial ? t("editDescription") : t("addDescription")}
             </p>
           </div>
           <button
@@ -107,7 +107,7 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
             type="button"
             onClick={onClose}
             className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-            aria-label="Cerrar formulario"
+            aria-label={t("closeForm")}
           >
             <CloseIcon />
           </button>
@@ -133,7 +133,7 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
 
         <div className="space-y-2">
           <label htmlFor="site-url" className="block text-sm font-medium text-slate-700">
-            URL del sitio
+            {t("siteUrl")}
           </label>
           <div className="relative">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
@@ -161,12 +161,12 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
 
         <div className="space-y-2">
           <label htmlFor="site-label" className="block text-sm font-medium text-slate-700">
-            Nombre personalizado {label ? <span className="text-slate-400">({label.length}/30)</span> : null}
+            {t("customName")} {label ? <span className="text-slate-400">({label.length}/30)</span> : null}
           </label>
           <input
             id="site-label"
             type="text"
-            placeholder="Mi sitio web"
+            placeholder={t("customNamePlaceholder")}
             maxLength={30}
             value={label}
             onChange={(event) => {
@@ -183,18 +183,18 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
         </div>
 
         <div className="space-y-3 pt-2">
-          <span className="block text-sm font-medium text-slate-700">Modo</span>
+          <span className="block text-sm font-medium text-slate-700">{t("mode")}</span>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <ScopeButton
               selected={mode === SITE_MODES.ALWAYS}
-              title="Bloqueo permanente"
-              description="Impide entrar hasta que lo desactives manualmente."
+              title={t("permanentBlock")}
+              description={t("permanentBlockDescription")}
               onClick={() => setMode(SITE_MODES.ALWAYS)}
             />
             <ScopeButton
               selected={mode === SITE_MODES.COOLDOWN}
-              title="Cooldown temporal"
-              description="Bloquea durante una duración concreta tras cada visita."
+              title={t("temporaryCooldown")}
+              description={t("temporaryCooldownDescription")}
               onClick={() => setMode(SITE_MODES.COOLDOWN)}
             />
           </div>
@@ -203,7 +203,7 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
         {mode === SITE_MODES.COOLDOWN ? (
           <div className="space-y-2">
             <label htmlFor="site-duration" className="block text-sm font-medium text-slate-700">
-              Tiempo de cooldown
+              {t("cooldownTime")}
             </label>
             <DurationInput inputId="site-duration" minutes={minutes} onChangeMinutes={setMinutes} />
           </div>
@@ -211,26 +211,26 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
 
         <div className="space-y-3 pt-2">
           <span className="block text-sm font-medium text-slate-700">
-            {extensionMode ? "Ámbito de bloqueo" : "Ámbito para la extensión"}
+            {extensionMode ? t("blockingScope") : t("extensionScope")}
           </span>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <ScopeButton
               selected={scope === "domain"}
-              title="Dominio completo"
+              title={t("wholeDomain")}
               description={
                 extensionMode
-                  ? "Bloquea las páginas del dominio con el modo elegido."
-                  : "Se aplicará al usar tus datos desde la extensión de Chrome."
+                  ? t("wholeDomainExtensionDescription")
+                  : t("webScopeDescription")
               }
               onClick={() => setScope("domain")}
             />
             <ScopeButton
               selected={scope === "exact"}
-              title="URL exacta"
+              title={t("exactUrl")}
               description={
                 extensionMode
-                  ? "Bloquea únicamente el enlace guardado con el modo elegido."
-                  : "Se aplicará al usar tus datos desde la extensión de Chrome."
+                  ? t("exactUrlExtensionDescription")
+                  : t("webScopeDescription")
               }
               onClick={() => setScope("exact")}
             />
@@ -247,7 +247,7 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
           className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
           disabled={isSubmitting}
         >
-          Cancelar
+          {t("cancel")}
         </button>
         <button
           type="button"
@@ -257,7 +257,13 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
             !isValid || isSubmitting ? "cursor-not-allowed bg-slate-300" : "bg-slate-950 hover:bg-slate-800"
           }`}
         >
-          {isSubmitting ? (initial ? "Guardando..." : "Añadiendo...") : initial ? "Guardar cambios" : "Añadir sitio"}
+          {isSubmitting
+            ? initial
+              ? t("saving")
+              : t("adding")
+            : initial
+              ? t("saveChanges")
+              : t("addSiteButton")}
         </button>
       </div>
     </DialogShell>

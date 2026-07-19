@@ -26,6 +26,8 @@ Funciones principales:
 
 Cooldown Tracker no envía tu historial ni tus reglas a servidores externos y no utiliza analítica ni publicidad.
 
+La extensión incluye interfaz localizada en español, inglés, francés, alemán, italiano, polaco, chino y ruso. Chrome selecciona automáticamente el idioma compatible más cercano y el usuario puede sustituirlo desde la configuración.
+
 ## Propósito único
 
 Ayudar al usuario a controlar la frecuencia con la que visita sitios web mediante bloqueos locales permanentes o temporales definidos por el propio usuario.

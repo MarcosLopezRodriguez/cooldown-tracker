@@ -1,0 +1,5 @@
+{
+  "extensionName": { "message": "Cooldown Tracker" },
+  "extensionDescription": { "message": "Controlla gli intervalli tra le visite e blocca i siti durante il cooldown." },
+  "actionTitle": { "message": "Apri Cooldown Tracker" }
+}

@@ -27,6 +27,10 @@ function sanitizeLabel(value, fallback) {
   return label ? label.slice(0, 30) : fallback;
 }
 
+function normalizeLanguage(value) {
+  return ["auto", "es", "en", "fr", "de", "it", "pl", "zh", "ru"].includes(value) ? value : "auto";
+}
+
 export function normalizeSettings(input) {
   const source = input && typeof input === "object" ? input : {};
   return {
@@ -44,6 +48,7 @@ export function normalizeSettings(input) {
           ? source.sound
           : DEFAULT_SETTINGS.soundOn,
     privacyAccepted: source.privacyAccepted === true,
+    language: normalizeLanguage(source.language),
   };
 }
 
@@ -120,22 +125,23 @@ export function buildExportPayload(items, settings, exportedAt = new Date().toIS
 export function parseImportPayload(text, options = {}) {
   const now = options.now ?? Date.now();
   const fallbackSettings = normalizeSettings(options.fallbackSettings);
+  const translate = options.translate || ((key) => key);
   let rawPayload;
 
   try {
     rawPayload = JSON.parse(text);
   } catch {
-    throw new Error("El archivo no contiene JSON válido.");
+    throw new Error(translate("invalidJson"));
   }
 
   const payload = Array.isArray(rawPayload) ? { version: 1, items: rawPayload } : rawPayload;
   if (!payload || typeof payload !== "object") {
-    throw new Error("El archivo no tiene un formato importable.");
+    throw new Error(translate("invalidImportFormat"));
   }
 
   const version = Number(payload.version) || 1;
   if (version > EXPORT_SCHEMA_VERSION) {
-    throw new Error("El archivo se creó con una versión más reciente de la aplicación.");
+    throw new Error(translate("newerImportVersion"));
   }
 
   const settings = payload.settings ? normalizeSettings(payload.settings) : null;
@@ -146,7 +152,7 @@ export function parseImportPayload(text, options = {}) {
   });
 
   if (!items.length && !settings) {
-    throw new Error("No se encontraron sitios ni ajustes válidos para importar.");
+    throw new Error(translate("noImportData"));
   }
 
   return {

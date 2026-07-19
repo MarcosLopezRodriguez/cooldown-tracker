@@ -1,6 +1,8 @@
 import React, { useRef, useState } from "react";
 import DialogShell from "./DialogShell.jsx";
 import DurationInput from "./DurationInput.jsx";
+import { LANGUAGE_OPTIONS } from "../../extension/i18n.js";
+import { useI18n } from "../i18n/I18nContext.jsx";
 
 export default function SettingsPanel({
   settings,
@@ -12,6 +14,7 @@ export default function SettingsPanel({
   notifSupported,
   permission,
 }) {
+  const { t } = useI18n();
   const closeButtonRef = useRef(null);
   const [importMessage, setImportMessage] = useState(null);
 
@@ -26,7 +29,7 @@ export default function SettingsPanel({
     if (file.size > 2 * 1024 * 1024) {
       setImportMessage({
         tone: "error",
-        text: "El archivo supera el límite de 2 MB.",
+        text: t("fileTooLarge"),
       });
       event.target.value = "";
       return;
@@ -36,12 +39,12 @@ export default function SettingsPanel({
       await onImport(file);
       setImportMessage({
         tone: "success",
-        text: "Datos importados correctamente.",
+        text: t("importSuccess"),
       });
     } catch (error) {
       setImportMessage({
         tone: "error",
-        text: error.message || "No se pudo importar el archivo.",
+        text: error.message || t("importError"),
       });
     } finally {
       event.target.value = "";
@@ -60,10 +63,10 @@ export default function SettingsPanel({
       <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
         <div>
           <h2 id="settings-title" className="text-xl font-semibold text-slate-900">
-            Configuración
+            {t("settings")}
           </h2>
           <p id="settings-description" className="mt-1 text-sm text-slate-500">
-            Ajusta notificaciones, sonidos y la duración por defecto de nuevos sitios.
+            {t("settingsDescription")}
           </p>
         </div>
         <button
@@ -71,19 +74,46 @@ export default function SettingsPanel({
           type="button"
           onClick={onClose}
           className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-          aria-label="Cerrar configuración"
+          aria-label={t("closeSettings")}
         >
           <CloseIcon />
         </button>
       </div>
 
       <div className="flex-1 divide-y divide-slate-100 overflow-y-auto">
+        <section className="space-y-3 px-6 py-5">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">{t("language")}</h3>
+            <p className="mt-1 text-sm text-slate-500">{t("languageDescription")}</p>
+          </div>
+          <div className="relative">
+            <select
+              value={settings.language}
+              onChange={(event) =>
+                setSettings((currentSettings) => ({
+                  ...currentSettings,
+                  language: event.target.value,
+                }))
+              }
+              className="block h-11 w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 pr-10 text-sm font-medium text-slate-800 shadow-sm transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+              aria-label={t("language")}
+            >
+              {LANGUAGE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.flag} {option.value === "auto" ? t("automatic") : option.name}
+                </option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-slate-400">
+              <ChevronIcon />
+            </span>
+          </div>
+        </section>
+
         <section className="space-y-4 px-6 py-5">
           <div>
-            <h3 className="text-sm font-semibold text-slate-900">Duración por defecto</h3>
-            <p className="mt-1 text-sm text-slate-500">
-              Se aplica a los sitios nuevos. Los existentes conservan su duración actual.
-            </p>
+            <h3 className="text-sm font-semibold text-slate-900">{t("defaultDuration")}</h3>
+            <p className="mt-1 text-sm text-slate-500">{t("defaultDurationDescription")}</p>
           </div>
           <DurationInput
             inputId="default-duration"
@@ -100,10 +130,8 @@ export default function SettingsPanel({
         <section className="space-y-4 px-6 py-5">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h3 className="text-sm font-semibold text-slate-900">Notificaciones</h3>
-              <p className="mt-1 text-sm text-slate-500">
-                Recibe avisos cuando un cooldown termina.
-              </p>
+              <h3 className="text-sm font-semibold text-slate-900">{t("notifications")}</h3>
+              <p className="mt-1 text-sm text-slate-500">{t("notificationsDescription")}</p>
             </div>
             <Toggle
               checked={settings.notificationsOn}
@@ -115,27 +143,25 @@ export default function SettingsPanel({
                   notificationsOn: nextValue,
                 }));
               }}
-              srLabel="Activar notificaciones"
+              srLabel={t("enableNotifications")}
             />
           </div>
           <p className="text-xs text-slate-500">
             {!notifSupported
-              ? "No disponibles en este navegador."
+              ? t("notificationsUnavailable")
               : permission === "granted"
-                ? "Permiso concedido."
+                ? t("permissionGranted")
                 : permission === "denied"
-                  ? "Permiso bloqueado en el navegador."
-                  : "Se solicitará permiso al activarlas."}
+                  ? t("permissionDenied")
+                  : t("permissionPrompt")}
           </p>
         </section>
 
         <section className="space-y-4 px-6 py-5">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h3 className="text-sm font-semibold text-slate-900">Sonido</h3>
-              <p className="mt-1 text-sm text-slate-500">
-                Reproduce un aviso de audio cuando un cooldown termina.
-              </p>
+              <h3 className="text-sm font-semibold text-slate-900">{t("sound")}</h3>
+              <p className="mt-1 text-sm text-slate-500">{t("soundDescription")}</p>
             </div>
             <Toggle
               checked={settings.soundOn}
@@ -145,17 +171,15 @@ export default function SettingsPanel({
                   soundOn: !currentSettings.soundOn,
                 }))
               }
-              srLabel="Activar sonido"
+              srLabel={t("enableSound")}
             />
           </div>
         </section>
 
         <section className="space-y-4 px-6 py-5">
           <div>
-            <h3 className="text-sm font-semibold text-slate-900">Datos</h3>
-            <p className="mt-1 text-sm text-slate-500">
-              Exporta un respaldo o importa datos guardados previamente.
-            </p>
+            <h3 className="text-sm font-semibold text-slate-900">{t("data")}</h3>
+            <p className="mt-1 text-sm text-slate-500">{t("dataDescription")}</p>
           </div>
 
           <div className="space-y-3">
@@ -165,12 +189,12 @@ export default function SettingsPanel({
               className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
             >
               <DownloadIcon />
-              Exportar datos
+              {t("exportData")}
             </button>
 
             <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
               <UploadIcon />
-              Importar datos
+              {t("importData")}
               <input type="file" className="hidden" accept=".json" onChange={handleImportChange} />
             </label>
 
@@ -209,6 +233,18 @@ function Toggle({ checked, disabled = false, onClick, srLabel }) {
         }`}
       />
     </button>
+  );
+}
+
+function ChevronIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <path
+        fillRule="evenodd"
+        d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.09 1.03l-4.25 4.5a.75.75 0 01-1.09 0l-4.25-4.5a.75.75 0 01.02-1.05z"
+        clipRule="evenodd"
+      />
+    </svg>
   );
 }
 

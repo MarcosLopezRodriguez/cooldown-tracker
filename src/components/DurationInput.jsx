@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { DURATION_PRESETS } from "../lib/constants.js";
-import { clampMinutes, formatMinutesLabel } from "../lib/utils.js";
+import { clampMinutes } from "../lib/utils.js";
+import { useI18n } from "../i18n/I18nContext.jsx";
 
 export default function DurationInput({ minutes, onChangeMinutes, inputId = "duration" }) {
+  const { t } = useI18n();
   const [value, setValue] = useState(String(minutes || 15));
 
   useEffect(() => {
@@ -23,7 +25,7 @@ export default function DurationInput({ minutes, onChangeMinutes, inputId = "dur
             onChangeMinutes(clampMinutes(value, minutes || 1));
           }}
         />
-        <span className="text-sm text-slate-600">minutos</span>
+        <span className="text-sm text-slate-600">{t("minutes")}</span>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -40,7 +42,7 @@ export default function DurationInput({ minutes, onChangeMinutes, inputId = "dur
                   : "bg-slate-100 text-slate-700 hover:bg-slate-200"
               }`}
             >
-              {formatMinutesLabel(preset)}
+              {preset < 60 ? `${preset}m` : t(preset === 60 ? "hour" : "hours", { count: preset / 60 })}
             </button>
           );
         })}

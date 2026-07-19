@@ -1,7 +1,9 @@
 import React, { useRef } from "react";
 import DialogShell from "./DialogShell.jsx";
+import { useI18n } from "../i18n/I18nContext.jsx";
 
 export default function PrivacyNotice({ onAccept }) {
+  const { t } = useI18n();
   const acceptButtonRef = useRef(null);
 
   return (
@@ -19,14 +21,13 @@ export default function PrivacyNotice({ onAccept }) {
           <LockIcon />
         </div>
         <h2 id="privacy-title" className="mt-5 text-xl font-semibold text-slate-950">
-          Tu actividad permanece en tu navegador
+          {t("privacyTitle")}
         </h2>
         <p id="privacy-description" className="mt-3 text-sm leading-6 text-slate-600">
-          Para aplicar tus reglas, Cooldown Tracker lee la dirección de la pestaña activa y las URLs que visitas.
-          Solo las compara con tu lista y guarda tu configuración localmente mediante Chrome Storage.
+          {t("privacyDescription")}
         </p>
         <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          No enviamos, vendemos ni compartimos tu historial, tus URLs o tu configuración con servidores o terceros.
+          {t("privacyNoShare")}
         </div>
         <button
           ref={acceptButtonRef}
@@ -34,7 +35,7 @@ export default function PrivacyNotice({ onAccept }) {
           onClick={onAccept}
           className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
         >
-          Aceptar y activar
+          {t("acceptAndActivate")}
         </button>
       </div>
     </DialogShell>

@@ -1,0 +1,5 @@
+{
+  "extensionName": { "message": "Cooldown Tracker" },
+  "extensionDescription": { "message": "控制网站访问间隔，并在冷却期间拦截网站。" },
+  "actionTitle": { "message": "打开 Cooldown Tracker" }
+}

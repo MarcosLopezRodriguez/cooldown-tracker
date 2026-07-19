@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Cooldown activo</title>
+    <title>Cooldown Tracker</title>
     <link rel="stylesheet" href="blocked.css" />
   </head>
   <body>
@@ -16,15 +16,15 @@
           <circle cx="29.5" cy="10.5" r="3.5" fill="#f16468" />
         </svg>
       </div>
-      <p id="eyebrow" class="eyebrow">Cooldown activo</p>
-      <h1 id="title">Esta visita está en pausa</h1>
-      <p id="description">Podrás volver a intentarlo cuando termine el temporizador.</p>
+      <p id="eyebrow" class="eyebrow"></p>
+      <h1 id="title"></h1>
+      <p id="description"></p>
       <p id="clock" class="clock" aria-live="polite">00:00:00</p>
       <div class="actions">
-        <button type="button" id="back-button">Volver</button>
-        <a href="index.html">Gestionar bloqueo</a>
+        <button type="button" id="back-button"></button>
+        <a id="manage-link" href="index.html"></a>
       </div>
     </main>
-    <script src="blocked.js"></script>
+    <script type="module" src="blocked.js"></script>
   </body>
 </html>

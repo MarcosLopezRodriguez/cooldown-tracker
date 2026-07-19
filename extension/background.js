@@ -1,3 +1,5 @@
+import { resolveLocale, translate } from "./i18n.js";
+
 const ITEMS_KEY = "cooldown_site_timers_v1";
 const SETTINGS_KEY = "cooldown_settings_v1";
 const ALARM_PREFIX = "cooldown:";
@@ -66,11 +68,13 @@ async function showReadyNotification(item, settings) {
     return;
   }
 
+  const locale = resolveLocale(settings.language);
+  const name = item.label || new URL(item.url).hostname;
   await chrome.notifications.create(`cooldown-ready:${item.id}:${Date.now()}`, {
     type: "basic",
     iconUrl: chrome.runtime.getURL("icons/icon128.png"),
-    title: `Listo para visitar: ${item.label || new URL(item.url).hostname}`,
-    message: "El cooldown ha terminado.",
+    title: translate(locale, "notificationTitle", { name }),
+    message: translate(locale, "notificationBody"),
     priority: 1,
   });
 }
@@ -143,13 +147,14 @@ async function enforceActiveCooldowns(items) {
 
 async function openSiteFromApp(siteId) {
   const { items, settings } = await readState();
+  const locale = resolveLocale(settings.language);
   if (settings.privacyAccepted !== true) {
-    throw new Error("Debes aceptar el aviso de privacidad antes de activar la extensión.");
+    throw new Error(translate(locale, "privacyRequired"));
   }
 
   const site = items.find((item) => item.id === siteId);
   if (!site) {
-    throw new Error("El sitio ya no existe.");
+    throw new Error(translate(locale, "siteMissing"));
   }
 
   const now = Date.now();
@@ -168,7 +173,7 @@ async function openSiteFromApp(siteId) {
   await chrome.storage.local.set({ [ITEMS_KEY]: nextItems });
   const tab = await chrome.tabs.create({ url: "about:blank", active: true });
   if (typeof tab.id !== "number") {
-    throw new Error("No se pudo crear la pestaña.");
+    throw new Error(translate(locale, "tabCreateError"));
   }
 
   allowedTabs.set(tab.id, {
