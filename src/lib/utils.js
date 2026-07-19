@@ -55,11 +55,19 @@ export function clampMinutes(value, fallback = 1) {
 }
 
 export function buildFaviconUrl(value) {
-  if (!value || isExtensionContext()) {
+  if (!value) {
     return null;
   }
 
-  const host = value.includes("://") ? hostnameFromUrl(value) : value;
+  const pageUrl = value.includes("://") ? value : `https://${value}`;
+  if (isExtensionContext() && globalThis.chrome?.runtime?.getURL) {
+    const faviconUrl = new URL(globalThis.chrome.runtime.getURL("/_favicon/"));
+    faviconUrl.searchParams.set("pageUrl", pageUrl);
+    faviconUrl.searchParams.set("size", "64");
+    return faviconUrl.toString();
+  }
+
+  const host = hostnameFromUrl(pageUrl);
   return host ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64` : null;
 }
 

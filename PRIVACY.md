@@ -33,6 +33,7 @@ Los datos permanecen en el navegador hasta que el usuario elimina un sitio, impo
 
 - `storage`: guardar sitios, preferencias y temporizadores localmente.
 - `alarms`: finalizar cooldowns y programar avisos aunque el popup esté cerrado.
+- `favicon`: mostrar junto a cada regla el icono local que Chrome conoce para ese sitio.
 - `notifications`: mostrar un aviso cuando un sitio vuelve a estar disponible.
 - `webNavigation`: detectar una navegación y aplicar las reglas configuradas.
 - Acceso a páginas `http` y `https`: comparar el dominio o URL visitada con la lista definida por el usuario y redirigir únicamente cuando existe un bloqueo coincidente.

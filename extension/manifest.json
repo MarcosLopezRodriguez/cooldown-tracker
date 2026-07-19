@@ -9,7 +9,7 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "permissions": ["alarms", "notifications", "storage", "webNavigation"],
+  "permissions": ["alarms", "favicon", "notifications", "storage", "webNavigation"],
   "host_permissions": ["http://*/*", "https://*/*"],
   "action": {
     "default_title": "Abrir Cooldown Tracker",

@@ -40,6 +40,10 @@ Guarda localmente la lista de sitios, el modo de bloqueo, los temporizadores y l
 
 Programa el final de los cooldowns para actualizar su estado aunque el popup de la extensión esté cerrado.
 
+### favicon
+
+Obtiene mediante la API local de Chrome el icono asociado a cada sitio guardado para identificarlo visualmente en el popup. No descarga ni transmite el icono a servidores propios.
+
 ### notifications
 
 Muestra un aviso local cuando termina un cooldown, únicamente si el usuario activa las notificaciones.
