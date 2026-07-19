@@ -1,7 +1,6 @@
 const ITEMS_KEY = "cooldown_site_timers_v1";
 const SETTINGS_KEY = "cooldown_settings_v1";
 const ALARM_PREFIX = "cooldown:";
-const pendingOpenUrls = new Map();
 const allowedTabs = new Map();
 
 function getAlarmName(item) {
@@ -76,47 +75,18 @@ async function showReadyNotification(item, settings) {
   });
 }
 
-function allowNextNavigation(url) {
-  const expiresAt = Date.now() + 10_000;
-  pendingOpenUrls.set(url, expiresAt);
-  return expiresAt;
-}
-
 function isAllowedNavigation(details, targetUrl) {
-  const allowedUntil = allowedTabs.get(details.tabId);
-  if (allowedUntil && allowedUntil > Date.now()) {
-    return true;
+  const allowance = allowedTabs.get(details.tabId);
+  if (!allowance) {
+    return false;
   }
 
-  if (allowedUntil) {
+  if (allowance.expiresAt <= Date.now()) {
     allowedTabs.delete(details.tabId);
-  }
-
-  const pendingUntil = pendingOpenUrls.get(targetUrl.href);
-  if (!pendingUntil) {
     return false;
   }
 
-  pendingOpenUrls.delete(targetUrl.href);
-  return pendingUntil > Date.now();
-}
-
-function isAllowedTab(tabId) {
-  if (typeof tabId !== "number") {
-    return false;
-  }
-
-  const allowedUntil = allowedTabs.get(tabId);
-  if (!allowedUntil) {
-    return false;
-  }
-
-  if (allowedUntil > Date.now()) {
-    return true;
-  }
-
-  allowedTabs.delete(tabId);
-  return false;
+  return matchesScope(allowance.site, targetUrl);
 }
 
 async function redirectBlockedTab(tabId, blockingItem, targetUrl) {
@@ -143,7 +113,7 @@ async function enforceActiveCooldowns(items) {
   const tabs = await chrome.tabs.query({});
   await Promise.all(
     tabs.map(async (tab) => {
-      if (typeof tab.id !== "number" || !tab.url || isAllowedTab(tab.id)) {
+      if (typeof tab.id !== "number" || !tab.url) {
         return;
       }
 
@@ -155,6 +125,10 @@ async function enforceActiveCooldowns(items) {
       }
 
       if (targetUrl.protocol !== "http:" && targetUrl.protocol !== "https:") {
+        return;
+      }
+
+      if (isAllowedNavigation({ tabId: tab.id }, targetUrl)) {
         return;
       }
 
@@ -186,11 +160,22 @@ async function openSiteFromApp(siteId) {
   );
 
   const targetUrl = new URL(site.url).href;
-  const expiresAt = allowNextNavigation(targetUrl);
   await chrome.storage.local.set({ [ITEMS_KEY]: nextItems });
-  const tab = await chrome.tabs.create({ url: site.url, active: true });
-  if (typeof tab.id === "number") {
-    allowedTabs.set(tab.id, expiresAt);
+  const tab = await chrome.tabs.create({ url: "about:blank", active: true });
+  if (typeof tab.id !== "number") {
+    throw new Error("No se pudo crear la pestaña.");
+  }
+
+  allowedTabs.set(tab.id, {
+    expiresAt: Date.now() + 10_000,
+    site,
+  });
+
+  try {
+    await chrome.tabs.update(tab.id, { url: targetUrl });
+  } catch (error) {
+    allowedTabs.delete(tab.id);
+    throw error;
   }
 }
 
@@ -219,6 +204,10 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     void syncCooldownAlarms(items);
     void enforceActiveCooldowns(items);
   }
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  allowedTabs.delete(tabId);
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {

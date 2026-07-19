@@ -30,11 +30,16 @@ export default function DialogShell({
   panelClassName = "",
 }) {
   const panelRef = useRef(null);
+  const onCloseRef = useRef(onClose);
   const overlayClassName = useMemo(() => {
     return variant === "side"
       ? "fixed inset-0 z-40 flex justify-end bg-slate-950/40 p-0 backdrop-blur-sm"
       : "fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm";
   }, [variant]);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     const previousActiveElement = document.activeElement;
@@ -50,7 +55,7 @@ export default function DialogShell({
     const handleKeyDown = (event) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -86,7 +91,7 @@ export default function DialogShell({
         previousActiveElement.focus({ preventScroll: true });
       }
     };
-  }, [initialFocusRef, onClose]);
+  }, [initialFocusRef]);
 
   const basePanelClassName =
     variant === "side"
