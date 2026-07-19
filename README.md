@@ -59,7 +59,7 @@ La primera vez que se abre la extensión se muestra una explicación del tratami
 
 Los textos preparados para la ficha, el propósito único, las justificaciones de permisos y la lista de recursos están en [docs/CHROME_WEB_STORE.md](docs/CHROME_WEB_STORE.md).
 
-La política que debe alojarse en una URL pública antes de enviar la extensión está en [PRIVACY.md](PRIVACY.md). Sustituye primero el marcador del correo de contacto.
+La política que debe alojarse en una URL pública antes de enviar la extensión está en [PRIVACY.md](PRIVACY.md).
 
 El icono de tienda está en `extension/icons/icon128.png`. Después de ejecutar `npm run build:extension`, comprime el contenido de `dist` de forma que `manifest.json` quede en la raíz del ZIP.
 

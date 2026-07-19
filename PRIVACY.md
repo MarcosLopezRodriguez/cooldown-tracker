@@ -40,4 +40,4 @@ Los datos permanecen en el navegador hasta que el usuario elimina un sitio, impo
 
 ## Contacto
 
-Para consultas sobre privacidad: **[AÑADIR_EMAIL_DE_CONTACTO_ANTES_DE_PUBLICAR]**.
+Para consultas sobre privacidad: **marcos.lopezrod@gmail.com**.

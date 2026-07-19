@@ -74,4 +74,4 @@ Es necesario para comparar dominios y URLs visitadas con la lista local de bloqu
 - Tile promocional pequeño: `440x280` en PNG o JPEG.
 - Imagen marquee opcional: `1400x560` en PNG o JPEG.
 
-Antes de publicar, sustituye el marcador de correo de `PRIVACY.md` y aloja esa política en una URL pública y estable.
+Antes de publicar, aloja `PRIVACY.md` en una URL pública y estable.
