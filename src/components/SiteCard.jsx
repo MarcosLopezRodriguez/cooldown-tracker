@@ -108,7 +108,7 @@ export default function SiteCard({
                 onClick={onClear}
                 className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
               >
-                Limpiar
+                Liberar
               </button>
             </>
           ) : null}
