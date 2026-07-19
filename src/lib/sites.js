@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, EXPORT_SCHEMA_VERSION } from "./constants.js";
+import { DEFAULT_SETTINGS, EXPORT_SCHEMA_VERSION, SITE_MODES } from "./constants.js";
 import { asTimestamp, buildFaviconUrl, hostnameFromUrl, isExtensionContext, normalizeUrl, uid } from "./utils.js";
 
 function normalizeDurationMs(value, fallback = DEFAULT_SETTINGS.defaultDurationMs) {
@@ -16,6 +16,10 @@ function normalizeScope(value) {
   }
 
   return "domain";
+}
+
+function normalizeMode(value) {
+  return value === SITE_MODES.ALWAYS || value === "permanent" ? SITE_MODES.ALWAYS : SITE_MODES.COOLDOWN;
 }
 
 function sanitizeLabel(value, fallback) {
@@ -60,8 +64,9 @@ export function normalizeSite(input, options = {}) {
   let lastVisitedAt = asTimestamp(input.lastVisitedAt, null);
   let endAt = asTimestamp(input.endAt, null);
   const durationMs = normalizeDurationMs(input.durationMs, fallbackDurationMs);
+  const mode = normalizeMode(input.mode);
 
-  if (endAt !== null && endAt <= now) {
+  if (mode === SITE_MODES.ALWAYS || (endAt !== null && endAt <= now)) {
     endAt = null;
   }
 
@@ -78,6 +83,7 @@ export function normalizeSite(input, options = {}) {
     url,
     label: sanitizeLabel(input.label, host),
     scope: normalizeScope(input.scope),
+    mode,
     durationMs,
     endAt,
     lastVisitedAt,
@@ -184,6 +190,7 @@ export function startCooldown(items, id, now = Date.now()) {
     item.id === id
       ? {
           ...item,
+          mode: SITE_MODES.COOLDOWN,
           lastVisitedAt: now,
           endAt: now + item.durationMs,
           updatedAt: now,
@@ -197,7 +204,22 @@ export function resetCooldown(items, id, now = Date.now()) {
     item.id === id
       ? {
           ...item,
+          mode: SITE_MODES.COOLDOWN,
+          lastVisitedAt: item.lastVisitedAt ?? now,
           endAt: now + item.durationMs,
+          updatedAt: now,
+        }
+      : item,
+  );
+}
+
+export function setPermanentBlock(items, id, now = Date.now()) {
+  return items.map((item) =>
+    item.id === id
+      ? {
+          ...item,
+          mode: SITE_MODES.ALWAYS,
+          endAt: null,
           updatedAt: now,
         }
       : item,
@@ -209,6 +231,7 @@ export function clearCooldown(items, id, now = Date.now()) {
     item.id === id
       ? {
           ...item,
+          mode: SITE_MODES.COOLDOWN,
           endAt: null,
           updatedAt: now,
         }
@@ -219,7 +242,7 @@ export function clearCooldown(items, id, now = Date.now()) {
 export function resolveExpiredCooldowns(items, now = Date.now()) {
   const completed = [];
   const nextItems = items.map((item) => {
-    if (!item.endAt || item.endAt > now) {
+    if (item.mode === SITE_MODES.ALWAYS || !item.endAt || item.endAt > now) {
       return item;
     }
 
@@ -239,17 +262,20 @@ export function resolveExpiredCooldowns(items, now = Date.now()) {
 
 export function getSiteView(item, now = Date.now()) {
   const host = hostnameFromUrl(item.url);
-  const remaining = item.endAt ? Math.max(0, item.endAt - now) : 0;
-  const ready = !item.endAt || item.endAt <= now;
+  const permanent = item.mode === SITE_MODES.ALWAYS;
+  const remaining = permanent ? 0 : item.endAt ? Math.max(0, item.endAt - now) : 0;
+  const ready = !permanent && (!item.endAt || item.endAt <= now);
   const total = item.durationMs;
   const elapsed =
-    item.endAt && item.lastVisitedAt ? Math.min(total, Math.max(0, now - item.lastVisitedAt)) : 0;
-  const progress = ready ? 100 : Math.round((elapsed / total) * 100);
+    !permanent && item.endAt && item.lastVisitedAt ? Math.min(total, Math.max(0, now - item.lastVisitedAt)) : 0;
+  const progress = permanent || ready ? 100 : Math.round((elapsed / total) * 100);
 
   return {
     host,
     remaining,
+    permanent,
     ready,
+    blocked: permanent || !ready,
     progress,
   };
 }
@@ -262,14 +288,18 @@ export function getVisibleSites(items, options = {}) {
     .toLowerCase();
 
   let visibleItems = items
-    .map((item) => ({ ...item, remaining: item.endAt ? Math.max(0, item.endAt - now) : 0 }))
+    .map((item) => ({
+      ...item,
+      blocked: item.mode === SITE_MODES.ALWAYS || Boolean(item.endAt && item.endAt > now),
+      remaining: item.endAt ? Math.max(0, item.endAt - now) : 0,
+    }))
     .filter((item) => {
       if (filter === "active") {
-        return Boolean(item.endAt && item.endAt > now);
+        return item.blocked;
       }
 
       if (filter === "ready") {
-        return !item.endAt || item.endAt <= now;
+        return !item.blocked;
       }
 
       return true;
@@ -283,8 +313,8 @@ export function getVisibleSites(items, options = {}) {
   }
 
   visibleItems.sort((left, right) => {
-    const leftActive = left.endAt ? 1 : 0;
-    const rightActive = right.endAt ? 1 : 0;
+    const leftActive = left.blocked ? 1 : 0;
+    const rightActive = right.blocked ? 1 : 0;
     if (leftActive !== rightActive) {
       return rightActive - leftActive;
     }

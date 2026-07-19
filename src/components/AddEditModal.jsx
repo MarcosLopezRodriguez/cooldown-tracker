@@ -2,11 +2,13 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import DialogShell from "./DialogShell.jsx";
 import DurationInput from "./DurationInput.jsx";
 import FaviconBadge from "./FaviconBadge.jsx";
+import { SITE_MODES } from "../lib/constants.js";
 import { buildFaviconUrl, clampMinutes, hostnameFromUrl, isExtensionContext, normalizeUrl } from "../lib/utils.js";
 
 export default function AddEditModal({ initial, defaultDurationMs, onClose, onSave }) {
   const inputRef = useRef(null);
   const closeButtonRef = useRef(null);
+  const extensionMode = isExtensionContext();
   const [url, setUrl] = useState(initial?.url || "");
   const [label, setLabel] = useState(initial?.label || "");
   const [isCustomLabel, setIsCustomLabel] = useState(() => {
@@ -17,22 +19,17 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
     return initial.label !== hostnameFromUrl(initial.url);
   });
   const [scope, setScope] = useState(initial?.scope || "domain");
+  const [mode, setMode] = useState(initial?.mode || (extensionMode ? SITE_MODES.ALWAYS : SITE_MODES.COOLDOWN));
   const [minutes, setMinutes] = useState(
     initial ? Math.round(initial.durationMs / 60_000) : Math.max(1, Math.round(defaultDurationMs / 60_000)),
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
 
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, []);
-
   const normalizedUrl = useMemo(() => normalizeUrl(url), [url]);
   const host = normalizedUrl ? hostnameFromUrl(normalizedUrl) : "";
   const favicon = normalizedUrl ? buildFaviconUrl(normalizedUrl) : null;
-  const isValid = Boolean(normalizedUrl) && minutes > 0;
+  const isValid = Boolean(normalizedUrl) && (mode === SITE_MODES.ALWAYS || minutes > 0);
 
   useEffect(() => {
     if (!host) {
@@ -43,8 +40,6 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
       setLabel(host);
     }
   }, [host, isCustomLabel]);
-
-  const extensionMode = isExtensionContext();
 
   const save = async () => {
     if (isSubmitting) {
@@ -71,9 +66,10 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
         url: safeUrl,
         label: (label || hostName).trim(),
         scope,
+        mode,
         durationMs,
-        endAt: initial?.endAt ?? null,
-        lastVisitedAt: initial?.lastVisitedAt ?? null,
+        endAt: mode === SITE_MODES.ALWAYS ? null : (initial?.endAt ?? null),
+        lastVisitedAt: mode === SITE_MODES.ALWAYS ? null : (initial?.lastVisitedAt ?? null),
         favicon: buildFaviconUrl(safeUrl),
         createdAt: initial?.createdAt ?? now,
       });
@@ -91,7 +87,6 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
       titleId="site-modal-title"
       descriptionId="site-modal-description"
       onClose={onClose}
-      initialFocusRef={inputRef}
       panelClassName="overflow-hidden"
     >
       <div className="border-b border-slate-100 px-6 py-5">
@@ -102,8 +97,8 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
             </h2>
             <p id="site-modal-description" className="mt-1 text-sm text-slate-500">
               {initial
-                ? "Actualiza el sitio y su configuración de cooldown."
-                : "Define la URL, el nombre visible y la duración del nuevo cooldown."}
+                ? "Actualiza el sitio y su configuración de bloqueo."
+                : "Define la URL, el nombre visible y cómo debe bloquearse."}
             </p>
           </div>
           <button
@@ -128,7 +123,7 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
               imageClassName="h-8 w-8"
             />
             {normalizedUrl ? (
-                <div className="absolute -bottom-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-emerald-500 text-white shadow-sm">
+              <div className="absolute -bottom-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-emerald-500 text-white shadow-sm">
                 <CheckIcon />
               </div>
             ) : null}
@@ -186,12 +181,32 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
           />
         </div>
 
-        <div className="space-y-2">
-          <label htmlFor="site-duration" className="block text-sm font-medium text-slate-700">
-            Tiempo de cooldown
-          </label>
-          <DurationInput inputId="site-duration" minutes={minutes} onChangeMinutes={setMinutes} />
+        <div className="space-y-3 pt-2">
+          <span className="block text-sm font-medium text-slate-700">Modo</span>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <ScopeButton
+              selected={mode === SITE_MODES.ALWAYS}
+              title="Bloqueo permanente"
+              description="Impide entrar hasta que lo desactives manualmente."
+              onClick={() => setMode(SITE_MODES.ALWAYS)}
+            />
+            <ScopeButton
+              selected={mode === SITE_MODES.COOLDOWN}
+              title="Cooldown temporal"
+              description="Bloquea durante una duración concreta tras cada visita."
+              onClick={() => setMode(SITE_MODES.COOLDOWN)}
+            />
+          </div>
         </div>
+
+        {mode === SITE_MODES.COOLDOWN ? (
+          <div className="space-y-2">
+            <label htmlFor="site-duration" className="block text-sm font-medium text-slate-700">
+              Tiempo de cooldown
+            </label>
+            <DurationInput inputId="site-duration" minutes={minutes} onChangeMinutes={setMinutes} />
+          </div>
+        ) : null}
 
         <div className="space-y-3 pt-2">
           <span className="block text-sm font-medium text-slate-700">
@@ -203,7 +218,7 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
               title="Dominio completo"
               description={
                 extensionMode
-                  ? "Bloquea las páginas del dominio mientras el cooldown esté activo."
+                  ? "Bloquea las páginas del dominio con el modo elegido."
                   : "Se aplicará al usar tus datos desde la extensión de Chrome."
               }
               onClick={() => setScope("domain")}
@@ -213,7 +228,7 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
               title="URL exacta"
               description={
                 extensionMode
-                  ? "Bloquea únicamente el enlace guardado mientras el cooldown esté activo."
+                  ? "Bloquea únicamente el enlace guardado con el modo elegido."
                   : "Se aplicará al usar tus datos desde la extensión de Chrome."
               }
               onClick={() => setScope("exact")}

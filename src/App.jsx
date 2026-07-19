@@ -5,7 +5,7 @@ import EmptyState from "./components/EmptyState.jsx";
 import SettingsPanel from "./components/SettingsPanel.jsx";
 import SiteCard from "./components/SiteCard.jsx";
 import ToastViewport from "./components/ToastViewport.jsx";
-import { FILTER_OPTIONS } from "./lib/constants.js";
+import { FILTER_OPTIONS, SITE_MODES } from "./lib/constants.js";
 import {
   buildExportPayload,
   clearCooldown,
@@ -14,6 +14,7 @@ import {
   removeSite,
   resolveExpiredCooldowns,
   resetCooldown,
+  setPermanentBlock,
   startCooldown,
   upsertSite,
 } from "./lib/sites.js";
@@ -26,7 +27,7 @@ import {
   subscribeToExtensionState,
   usesExtensionStorage,
 } from "./lib/storage.js";
-import { downloadJsonFile, formatClock, hostnameFromUrl, isExtensionContext } from "./lib/utils.js";
+import { downloadJsonFile, formatClock, hostnameFromUrl, isExtensionContext, normalizeUrl } from "./lib/utils.js";
 import { useNotificationCenter } from "./hooks/useNotificationCenter.js";
 import { useToasts } from "./hooks/useToasts.js";
 
@@ -43,6 +44,7 @@ export default function CooldownApp() {
   const [showForm, setShowForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [activeTab, setActiveTab] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [durationDecision, setDurationDecision] = useState(null);
   const { toasts, push } = useToasts();
@@ -121,6 +123,30 @@ export default function CooldownApp() {
   }, [storageReady]);
 
   useEffect(() => {
+    if (!extensionMode || !globalThis.chrome?.tabs?.query) {
+      return;
+    }
+
+    globalThis.chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (globalThis.chrome.runtime.lastError) {
+        return;
+      }
+
+      const tab = Array.isArray(tabs) ? tabs[0] : null;
+      const url = normalizeUrl(tab?.url);
+      if (!url || !/^https?:\/\//i.test(url)) {
+        setActiveTab(null);
+        return;
+      }
+
+      setActiveTab({
+        title: typeof tab.title === "string" ? tab.title : "",
+        url,
+      });
+    });
+  }, [extensionMode, storageReady]);
+
+  useEffect(() => {
     const timerId = window.setInterval(() => {
       setNow(Date.now());
     }, 1000);
@@ -197,10 +223,24 @@ export default function CooldownApp() {
     [items, filter, query, now],
   );
 
+  const activeTabSite = useMemo(() => {
+    if (!activeTab?.url) {
+      return null;
+    }
+
+    const activeHost = hostnameFromUrl(activeTab.url);
+    return (
+      items.find((item) => item.url === activeTab.url) ||
+      items.find((item) => item.scope === "domain" && hostnameFromUrl(item.url) === activeHost) ||
+      null
+    );
+  }, [activeTab, items]);
+
   const summary = useMemo(() => {
-    const activeItems = items.filter((item) => item.endAt && item.endAt > now);
-    const readyCount = items.length - activeItems.length;
-    const nextReady = activeItems.reduce((closest, item) => {
+    const blockedItems = items.filter((item) => item.mode === SITE_MODES.ALWAYS || (item.endAt && item.endAt > now));
+    const timedItems = items.filter((item) => item.mode !== SITE_MODES.ALWAYS && item.endAt && item.endAt > now);
+    const readyCount = items.length - blockedItems.length;
+    const nextReady = timedItems.reduce((closest, item) => {
       if (!closest || item.endAt < closest.endAt) {
         return item;
       }
@@ -210,7 +250,7 @@ export default function CooldownApp() {
 
     return {
       total: items.length,
-      active: activeItems.length,
+      active: blockedItems.length,
       ready: readyCount,
       nextReady,
       nextReadyRemaining: nextReady ? Math.max(0, nextReady.endAt - now) : 0,
@@ -232,13 +272,13 @@ export default function CooldownApp() {
     const existing = items.find((item) => item.id === payload.id) || editing;
     const isEditing = Boolean(existing);
 
-    if (existing && existing.endAt && payload.durationMs !== existing.durationMs) {
+    if (existing && existing.mode !== SITE_MODES.ALWAYS && existing.endAt && payload.durationMs !== existing.durationMs) {
       setDurationDecision({ payload, existing });
       closeForm();
       return;
     }
 
-    if (!isEditing && extensionMode) {
+    if (!isEditing && extensionMode && payload.mode === SITE_MODES.COOLDOWN) {
       const stamp = Date.now();
       commitItem(
         {
@@ -253,7 +293,14 @@ export default function CooldownApp() {
       return;
     }
 
-    commitItem(payload, isEditing ? "Sitio actualizado." : "Sitio añadido.");
+    commitItem(
+      payload,
+      isEditing
+        ? "Sitio actualizado."
+        : payload.mode === SITE_MODES.ALWAYS
+          ? "Sitio añadido y bloqueo permanente activado."
+          : "Sitio añadido.",
+    );
     closeForm();
   };
 
@@ -316,6 +363,39 @@ export default function CooldownApp() {
     }
 
     runCooldownAction(startCooldown, item.id);
+  };
+
+  const handleBlockActiveTab = () => {
+    if (!activeTab?.url) {
+      push("No hay una pestaña web activa para bloquear.", "error");
+      return;
+    }
+
+    const stamp = Date.now();
+    const host = hostnameFromUrl(activeTab.url);
+    setNow(stamp);
+    setItems((currentItems) => {
+      const existing =
+        currentItems.find((item) => item.url === activeTab.url) ||
+        currentItems.find((item) => item.scope === "domain" && hostnameFromUrl(item.url) === host);
+
+      return upsertSite(
+        currentItems,
+        {
+          id: existing?.id,
+          url: existing?.url || activeTab.url,
+          label: existing?.label || host,
+          scope: existing?.scope || "domain",
+          mode: SITE_MODES.ALWAYS,
+          durationMs: existing?.durationMs || settingsRef.current.defaultDurationMs,
+          endAt: null,
+          lastVisitedAt: null,
+          createdAt: existing?.createdAt || stamp,
+        },
+        stamp,
+      );
+    });
+    push(`"${host}" bloqueado de forma permanente.`, "success");
   };
 
   const handleExport = () => {
@@ -418,10 +498,14 @@ export default function CooldownApp() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+        {extensionMode ? (
+          <ActiveTabQuickBlock activeTab={activeTab} existingSite={activeTabSite} onBlock={handleBlockActiveTab} />
+        ) : null}
+
         <section className="mb-5 grid gap-3 md:grid-cols-4">
           <SummaryTile label="Sitios guardados" value={summary.total} tone="slate" />
-          <SummaryTile label="En cooldown" value={summary.active} tone="amber" />
-          <SummaryTile label="Listos ahora" value={summary.ready} tone="emerald" />
+          <SummaryTile label="Bloqueados" value={summary.active} tone="amber" />
+          <SummaryTile label="Libres ahora" value={summary.ready} tone="emerald" />
           <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Próximo disponible</p>
             {summary.nextReady ? (
@@ -461,7 +545,14 @@ export default function CooldownApp() {
                     )
                   }
                   onReset={() => runCooldownAction(resetCooldown, item.id, "Cooldown reiniciado.")}
-                  onClear={() => runCooldownAction(clearCooldown, item.id, "Cooldown limpiado.")}
+                  onClear={() =>
+                    runCooldownAction(
+                      clearCooldown,
+                      item.id,
+                      item.mode === SITE_MODES.ALWAYS ? "Bloqueo desactivado." : "Cooldown limpiado.",
+                    )
+                  }
+                  onMakePermanent={() => runCooldownAction(setPermanentBlock, item.id, "Bloqueo permanente activado.")}
                   onEdit={() => {
                     setEditing(item);
                     setShowForm(true);
@@ -552,6 +643,41 @@ export default function CooldownApp() {
   );
 }
 
+function ActiveTabQuickBlock({ activeTab, existingSite, onBlock }) {
+  const host = activeTab?.url ? hostnameFromUrl(activeTab.url) : "";
+  const alreadyPermanent = existingSite?.mode === SITE_MODES.ALWAYS;
+
+  return (
+    <section className="mb-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Pestaña activa</p>
+          <p className="mt-1 truncate text-base font-semibold text-slate-950">
+            {host || "Sin pestaña web activa"}
+          </p>
+          <p className="mt-0.5 truncate text-sm text-slate-500">
+            {activeTab?.title || activeTab?.url || "Abre una página http o https para capturarla."}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onBlock}
+          disabled={!activeTab?.url || alreadyPermanent}
+          className={`inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition ${
+            !activeTab?.url || alreadyPermanent
+              ? "cursor-not-allowed bg-slate-100 text-slate-400"
+              : "bg-rose-600 text-white hover:bg-rose-700"
+          }`}
+        >
+          <ShieldIcon />
+          {alreadyPermanent ? "Ya bloqueada" : "Bloquear pestaña"}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function SummaryTile({ label, value, tone }) {
   const toneClassName =
     tone === "amber"
@@ -568,6 +694,18 @@ function SummaryTile({ label, value, tone }) {
       </div>
       <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{value}</p>
     </div>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <path
+        fillRule="evenodd"
+        d="M10 2.25c.24 0 .48.052.7.156l5 2.36A1.25 1.25 0 0116.42 5.9v3.54c0 3.44-2.06 6.55-5.23 7.89l-.7.296a1.25 1.25 0 01-.98 0l-.7-.296C5.64 15.99 3.58 12.88 3.58 9.44V5.9c0-.484.28-.924.72-1.133l5-2.36c.22-.104.46-.156.7-.156zm3.03 6.72a.75.75 0 00-1.06-1.06L9.25 10.63 8.03 9.41a.75.75 0 00-1.06 1.06l1.75 1.75c.293.293.767.293 1.06 0l3.25-3.25z"
+        clipRule="evenodd"
+      />
+    </svg>
   );
 }
 

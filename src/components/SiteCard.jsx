@@ -11,15 +11,22 @@ export default function SiteCard({
   onStart,
   onReset,
   onClear,
+  onMakePermanent,
   onEdit,
   onDelete,
 }) {
   const view = getSiteView(item, now);
-  const statusText = view.ready ? "Listo" : formatClock(view.remaining);
+  const statusText = view.permanent ? "Siempre" : view.ready ? "Libre" : formatClock(view.remaining);
+  const statusLabel = view.permanent ? "Permanente" : view.ready ? "Libre" : "En cooldown";
+  const statusClassName = view.permanent
+    ? "bg-rose-50 text-rose-700"
+    : view.ready
+      ? "bg-emerald-50 text-emerald-700"
+      : "bg-amber-50 text-amber-700";
 
   return (
     <article className="group relative overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
-      <div className={`h-1 w-full ${view.ready ? "bg-emerald-500" : "bg-amber-500"}`} />
+      <div className={`h-1 w-full ${view.permanent ? "bg-rose-500" : view.ready ? "bg-emerald-500" : "bg-amber-500"}`} />
 
       <div className="p-4">
         <div className="flex items-start gap-4">
@@ -35,17 +42,15 @@ export default function SiteCard({
               </div>
               <div className="shrink-0 text-right">
                 <span
-                  className={`inline-flex rounded-md px-2 py-1 text-xs font-medium ${
-                    view.ready ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
-                  }`}
+                  className={`inline-flex rounded-md px-2 py-1 text-xs font-medium ${statusClassName}`}
                 >
-                  {view.ready ? "Listo" : "En cooldown"}
+                  {statusLabel}
                 </span>
                 <div className="mt-2 font-mono text-sm tabular-nums text-slate-600">{statusText}</div>
               </div>
             </div>
 
-            {!view.ready ? (
+            {!view.ready && !view.permanent ? (
               <div className="mt-4 space-y-1.5">
                 <div className="flex items-center justify-between text-xs text-slate-500">
                   <span>Progreso</span>
@@ -71,18 +76,20 @@ export default function SiteCard({
             className="inline-flex h-8 items-center gap-1.5 rounded-md bg-slate-950 px-3 text-sm font-medium text-white transition hover:bg-slate-800"
           >
             <PlayIcon />
-            Abrir
+            {view.permanent ? "Abrir una vez" : "Abrir"}
           </a>
-          <button
-            type="button"
-            onClick={onStart}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-          >
-            <ClockIcon />
-            {extensionMode && view.ready ? "Bloquear ahora" : "Marcar visitado"}
-          </button>
+          {!view.permanent ? (
+            <button
+              type="button"
+              onClick={onStart}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              <ClockIcon />
+              {extensionMode && view.ready ? "Bloquear ahora" : "Marcar visitado"}
+            </button>
+          ) : null}
 
-          {!view.ready ? (
+          {!view.ready && !view.permanent ? (
             <>
               <button
                 type="button"
@@ -100,6 +107,27 @@ export default function SiteCard({
                 Limpiar
               </button>
             </>
+          ) : null}
+
+          {extensionMode && !view.permanent ? (
+            <button
+              type="button"
+              onClick={onMakePermanent}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-rose-200 px-3 text-sm font-medium text-rose-700 transition hover:border-rose-300 hover:bg-rose-50"
+            >
+              <ShieldIcon />
+              Permanente
+            </button>
+          ) : null}
+
+          {view.permanent ? (
+            <button
+              type="button"
+              onClick={onClear}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              Desbloquear
+            </button>
           ) : null}
 
           <div className="ml-auto flex items-center gap-1">
@@ -125,6 +153,18 @@ export default function SiteCard({
         </div>
       </div>
     </article>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <path
+        fillRule="evenodd"
+        d="M10 2.25c.24 0 .48.052.7.156l5 2.36A1.25 1.25 0 0116.42 5.9v3.54c0 3.44-2.06 6.55-5.23 7.89l-.7.296a1.25 1.25 0 01-.98 0l-.7-.296C5.64 15.99 3.58 12.88 3.58 9.44V5.9c0-.484.28-.924.72-1.133l5-2.36c.22-.104.46-.156.7-.156zm3.03 6.72a.75.75 0 00-1.06-1.06L9.25 10.63 8.03 9.41a.75.75 0 00-1.06 1.06l1.75 1.75c.293.293.767.293 1.06 0l3.25-3.25z"
+        clipRule="evenodd"
+      />
+    </svg>
   );
 }
 

@@ -4,12 +4,12 @@ Cooldown Tracker registra pausas entre visitas a sitios frecuentes. Puede usarse
 
 ## Funciones
 
-- Guarda sitios con una duración de cooldown independiente.
+- Guarda sitios con bloqueo permanente o con una duración de cooldown independiente.
 - Inicia el temporizador al abrir un sitio desde la aplicación o al marcar una visita.
 - Filtra, busca y ordena los sitios por estado.
 - Exporta e importa datos en JSON versionado.
 - Muestra avisos y sonido mientras la aplicación está abierta.
-- En la extensión de Chrome, bloquea la navegación de sitios en cooldown y avisa incluso si la página de la aplicación está cerrada.
+- En la extensión de Chrome, bloquea la navegación de sitios en cooldown o con bloqueo permanente y avisa incluso si la página de la aplicación está cerrada.
 
 ## Aplicación web
 
@@ -39,14 +39,14 @@ Después, en Chrome abre `chrome://extensions`, activa el modo de desarrollador 
 
 No cargues la carpeta `public` ni la raíz del proyecto como extensión: esas carpetas no contienen la aplicación empaquetada. Si Chrome muestra `ERR_FILE_NOT_FOUND` al pulsar el icono de la barra, elimina esa carga anterior y vuelve a cargar `dist`.
 
-La extensión solicita acceso a páginas `http` y `https` para poder detectar y redirigir una navegación cuando exista un cooldown activo. Los datos se almacenan localmente en Chrome mediante `chrome.storage`.
+La extensión solicita acceso a páginas `http` y `https` para poder detectar y redirigir una navegación cuando exista un cooldown activo o un bloqueo permanente. Los datos se almacenan localmente en Chrome mediante `chrome.storage`.
 
 Al abrir un sitio desde la extensión, esa visita queda permitida y reinicia su cooldown. A partir de ahí:
 
 - `Dominio completo` bloquea ese dominio y sus subdominios.
 - `URL exacta` bloquea únicamente el enlace guardado.
 
-Al añadir un sitio desde el popup de la extensión, el cooldown empieza en ese momento para que el dominio quede bloqueado inmediatamente.
+Desde el popup puedes bloquear directamente la pestaña activa. Al añadir un sitio puedes elegir entre `Bloqueo permanente` y `Cooldown temporal`; el modo permanente queda activo hasta que lo desactives manualmente.
 
 La aplicación web y la extensión usan almacenes distintos por seguridad del navegador. Usa la exportación e importación JSON para mover tus datos entre ambas instalaciones.
 

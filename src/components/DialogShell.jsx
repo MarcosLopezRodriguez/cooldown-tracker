@@ -43,10 +43,9 @@ export default function DialogShell({
 
     const panelNode = panelRef.current;
     const fallbackTarget = panelNode;
-    const focusTarget =
-      initialFocusRef?.current || getFocusableNodes(panelNode)[0] || fallbackTarget;
+    const focusTarget = initialFocusRef?.current || fallbackTarget;
 
-    focusTarget?.focus();
+    focusTarget?.focus({ preventScroll: true });
 
     const handleKeyDown = (event) => {
       if (event.key === "Escape") {
@@ -84,7 +83,7 @@ export default function DialogShell({
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = previousOverflow;
       if (previousActiveElement instanceof HTMLElement) {
-        previousActiveElement.focus();
+        previousActiveElement.focus({ preventScroll: true });
       }
     };
   }, [initialFocusRef, onClose]);

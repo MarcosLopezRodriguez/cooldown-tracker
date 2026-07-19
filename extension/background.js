@@ -9,7 +9,15 @@ function getAlarmName(item) {
 }
 
 function isActive(item, now = Date.now()) {
+  if (item?.mode === "always") {
+    return true;
+  }
+
   return Number.isFinite(item?.endAt) && item.endAt > now;
+}
+
+function isTimedCooldown(item, now = Date.now()) {
+  return item?.mode !== "always" && Number.isFinite(item?.endAt) && item.endAt > now;
 }
 
 function matchesScope(item, targetUrl) {
@@ -34,7 +42,7 @@ async function readState() {
 }
 
 async function syncCooldownAlarms(items) {
-  const activeItems = items.filter((item) => isActive(item));
+  const activeItems = items.filter((item) => isTimedCooldown(item));
   const activeAlarmNames = new Set(activeItems.map(getAlarmName));
   const existingAlarms = await chrome.alarms.getAll();
 
@@ -114,8 +122,12 @@ function isAllowedTab(tabId) {
 async function redirectBlockedTab(tabId, blockingItem, targetUrl) {
   const params = new URLSearchParams({
     label: blockingItem.label || targetUrl.hostname,
-    endAt: String(blockingItem.endAt),
+    mode: blockingItem.mode === "always" ? "always" : "cooldown",
   });
+
+  if (Number.isFinite(blockingItem.endAt)) {
+    params.set("endAt", String(blockingItem.endAt));
+  }
 
   await chrome.tabs.update(tabId, {
     url: chrome.runtime.getURL(`blocked.html?${params.toString()}`),
@@ -167,7 +179,7 @@ async function openSiteFromApp(siteId) {
       ? {
           ...item,
           lastVisitedAt: now,
-          endAt: now + item.durationMs,
+          endAt: item.mode === "always" ? null : now + item.durationMs,
           updatedAt: now,
         }
       : item,
@@ -217,7 +229,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   void (async () => {
     const { items, settings } = await readState();
     const item = items.find((candidate) => getAlarmName(candidate) === alarm.name);
-    if (!item || !Number.isFinite(item.endAt)) {
+    if (!item || item.mode === "always" || !Number.isFinite(item.endAt)) {
       return;
     }
 
