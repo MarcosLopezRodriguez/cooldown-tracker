@@ -68,7 +68,7 @@ async function showReadyNotification(item, settings) {
 
   await chrome.notifications.create(`cooldown-ready:${item.id}:${Date.now()}`, {
     type: "basic",
-    iconUrl: chrome.runtime.getURL("favicon.ico"),
+    iconUrl: chrome.runtime.getURL("icons/icon128.png"),
     title: `Listo para visitar: ${item.label || new URL(item.url).hostname}`,
     message: "El cooldown ha terminado.",
     priority: 1,
@@ -93,6 +93,7 @@ async function redirectBlockedTab(tabId, blockingItem, targetUrl) {
   const params = new URLSearchParams({
     label: blockingItem.label || targetUrl.hostname,
     mode: blockingItem.mode === "always" ? "always" : "cooldown",
+    target: targetUrl.href,
   });
 
   if (Number.isFinite(blockingItem.endAt)) {
@@ -141,7 +142,11 @@ async function enforceActiveCooldowns(items) {
 }
 
 async function openSiteFromApp(siteId) {
-  const { items } = await readState();
+  const { items, settings } = await readState();
+  if (settings.privacyAccepted !== true) {
+    throw new Error("Debes aceptar el aviso de privacidad antes de activar la extensión.");
+  }
+
   const site = items.find((item) => item.id === siteId);
   if (!site) {
     throw new Error("El sitio ya no existe.");
@@ -204,6 +209,10 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     void syncCooldownAlarms(items);
     void enforceActiveCooldowns(items);
   }
+
+  if (areaName === "local" && changes[SETTINGS_KEY]?.newValue?.privacyAccepted === true) {
+    void readState().then(({ items }) => enforceActiveCooldowns(items));
+  }
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
@@ -240,6 +249,11 @@ chrome.webNavigation.onBeforeNavigate.addListener((details) => {
   }
 
   void (async () => {
+    const { items, settings } = await readState();
+    if (settings.privacyAccepted !== true) {
+      return;
+    }
+
     let targetUrl;
     try {
       targetUrl = new URL(details.url);
@@ -255,7 +269,6 @@ chrome.webNavigation.onBeforeNavigate.addListener((details) => {
       return;
     }
 
-    const { items } = await readState();
     const blockingItem = items.find((item) => isActive(item) && matchesScope(item, targetUrl));
     if (!blockingItem) {
       return;

@@ -1,19 +1,25 @@
 import React from "react";
 
-export default function EmptyState({ onAdd }) {
+export default function EmptyState({ onAdd, extensionMode = false }) {
   return (
-    <div className="mt-12 rounded-lg border border-dashed border-slate-300 bg-white px-6 py-14 text-center shadow-sm">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+    <div
+      className={`rounded-lg border border-dashed border-slate-300 bg-white px-6 text-center shadow-sm ${
+        extensionMode ? "mt-3 py-8" : "mt-12 py-14"
+      }`}
+    >
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
         <HourglassIcon />
       </div>
-      <h2 className="mt-6 text-2xl font-semibold text-slate-950">Aún no hay sitios</h2>
-      <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-500">
+      <h2 className={`${extensionMode ? "mt-4 text-lg" : "mt-6 text-2xl"} font-semibold text-slate-950`}>
+        Aún no hay sitios
+      </h2>
+      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
         Añade webs que visitas con frecuencia para crear cooldowns personalizados y decidir cuándo puedes volver.
       </p>
       <button
         type="button"
         onClick={onAdd}
-        className="mt-6 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
+        className="mt-5 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
       >
         Añadir primer sitio
       </button>

@@ -5,6 +5,7 @@ import EmptyState from "./components/EmptyState.jsx";
 import SettingsPanel from "./components/SettingsPanel.jsx";
 import SiteCard from "./components/SiteCard.jsx";
 import ToastViewport from "./components/ToastViewport.jsx";
+import PrivacyNotice from "./components/PrivacyNotice.jsx";
 import { FILTER_OPTIONS, SITE_MODES } from "./lib/constants.js";
 import {
   buildExportPayload,
@@ -123,7 +124,8 @@ export default function CooldownApp() {
   }, [storageReady]);
 
   useEffect(() => {
-    if (!extensionMode || !globalThis.chrome?.tabs?.query) {
+    if (!extensionMode || !settings.privacyAccepted || !globalThis.chrome?.tabs?.query) {
+      setActiveTab(null);
       return;
     }
 
@@ -144,7 +146,7 @@ export default function CooldownApp() {
         url,
       });
     });
-  }, [extensionMode, storageReady]);
+  }, [extensionMode, settings.privacyAccepted, storageReady]);
 
   useEffect(() => {
     const timerId = window.setInterval(() => {
@@ -427,21 +429,54 @@ export default function CooldownApp() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f6f7f9] text-slate-950">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+    <div
+      className={`cooldown-app min-h-screen bg-[#f4f7f6] text-slate-950 ${extensionMode ? "extension-shell" : ""}`}
+    >
+      <header className="app-header sticky top-0 z-20 border-b border-slate-200/80 bg-white/95 backdrop-blur">
+        <div
+          className={`mx-auto flex max-w-7xl flex-col gap-4 px-4 py-3 sm:px-6 ${
+            extensionMode ? "" : "lg:flex-row lg:items-center lg:justify-between"
+          }`}
+        >
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-950 text-sm font-semibold text-white shadow-sm">
-              CT
+            <div className="brand-mark flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg shadow-sm">
+              <BrandMark />
             </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-slate-950">Cooldown Tracker</h1>
-              <p className="text-sm text-slate-500">Controla pausas entre visitas sin perder contexto.</p>
+            <div className="min-w-0 flex-1">
+              <h1 className="truncate text-lg font-semibold text-slate-950">Cooldown Tracker</h1>
+              <p className="truncate text-xs text-slate-500">Decide cuándo volver, antes de volver por impulso.</p>
             </div>
+
+            {extensionMode ? (
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSettings(true)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950"
+                  title="Configuración"
+                  aria-label="Abrir configuración"
+                >
+                  <SettingsIcon />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditing(null);
+                    setShowForm(true);
+                  }}
+                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-slate-950 px-3 text-xs font-semibold text-white transition hover:bg-slate-800"
+                >
+                  <PlusIcon />
+                  <span>Nuevo sitio</span>
+                </button>
+              </div>
+            ) : null}
           </div>
 
-          <div className="flex w-full flex-col gap-2 lg:w-auto lg:flex-row lg:items-center">
-            <div className="relative w-full lg:w-72">
+          <div
+            className={`flex w-full flex-col gap-2 ${extensionMode ? "" : "lg:w-auto lg:flex-row lg:items-center"}`}
+          >
+            <div className={`relative w-full ${extensionMode ? "" : "lg:w-72"}`}>
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
                 <SearchIcon />
               </div>
@@ -454,13 +489,14 @@ export default function CooldownApp() {
               />
             </div>
 
-            <div className="inline-flex rounded-lg bg-slate-100 p-1">
+            <div className="inline-flex min-h-10 rounded-lg bg-slate-100 p-1">
               {FILTER_OPTIONS.map((option) => (
                 <button
                   key={option.value}
                   type="button"
                   onClick={() => setFilter(option.value)}
-                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                  aria-pressed={filter === option.value}
+                  className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${
                     filter === option.value
                       ? "bg-white text-slate-900 shadow-sm"
                       : "text-slate-600 hover:text-slate-900"
@@ -471,7 +507,7 @@ export default function CooldownApp() {
               ))}
             </div>
 
-            <div className="flex items-center gap-2">
+            {!extensionMode ? <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setShowSettings(true)}
@@ -492,44 +528,51 @@ export default function CooldownApp() {
                 <PlusIcon />
                 <span>Nuevo sitio</span>
               </button>
-            </div>
+            </div> : null}
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+      <main className={`mx-auto max-w-7xl px-4 ${extensionMode ? "py-4" : "py-6 sm:px-6"}`}>
         {extensionMode ? (
           <ActiveTabQuickBlock activeTab={activeTab} existingSite={activeTabSite} onBlock={handleBlockActiveTab} />
         ) : null}
 
-        <section className="mb-5 grid gap-3 md:grid-cols-4">
-          <SummaryTile label="Sitios guardados" value={summary.total} tone="slate" />
-          <SummaryTile label="Bloqueados" value={summary.active} tone="amber" />
-          <SummaryTile label="Libres ahora" value={summary.ready} tone="emerald" />
-          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Próximo disponible</p>
-            {summary.nextReady ? (
-              <>
-                <p className="mt-2 truncate text-base font-semibold text-slate-950">
-                  {summary.nextReady.label || hostnameFromUrl(summary.nextReady.url)}
-                </p>
-                <p className="mt-1 font-mono text-sm tabular-nums text-slate-500">
-                  {formatClock(summary.nextReadyRemaining)}
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="mt-2 text-base font-semibold text-slate-950">Sin esperas</p>
-                <p className="mt-1 text-sm text-slate-500">Todo está listo para visitar.</p>
-              </>
-            )}
-          </div>
-        </section>
+        {extensionMode ? (
+          <ExtensionSummary summary={summary} />
+        ) : (
+          <section className="mb-5 grid gap-3 md:grid-cols-4">
+            <SummaryTile label="Sitios guardados" value={summary.total} tone="slate" />
+            <SummaryTile label="Bloqueados" value={summary.active} tone="amber" />
+            <SummaryTile label="Libres ahora" value={summary.ready} tone="emerald" />
+            <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Próximo disponible</p>
+              {summary.nextReady ? (
+                <>
+                  <p className="mt-2 truncate text-base font-semibold text-slate-950">
+                    {summary.nextReady.label || hostnameFromUrl(summary.nextReady.url)}
+                  </p>
+                  <p className="mt-1 font-mono text-sm tabular-nums text-slate-500">
+                    {formatClock(summary.nextReadyRemaining)}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="mt-2 text-base font-semibold text-slate-950">Sin esperas</p>
+                  <p className="mt-1 text-sm text-slate-500">Todo está listo para visitar.</p>
+                </>
+              )}
+            </div>
+          </section>
+        )}
 
         {visibleItems.length === 0 ? (
-          <EmptyState onAdd={() => setShowForm(true)} />
+          <EmptyState extensionMode={extensionMode} onAdd={() => setShowForm(true)} />
         ) : (
-          <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" aria-live="polite">
+          <ul
+            className={`grid gap-3 ${extensionMode ? "grid-cols-1" : "md:grid-cols-2 xl:grid-cols-3"}`}
+            aria-live="polite"
+          >
             {visibleItems.map((item) => (
               <li key={item.id}>
                 <SiteCard
@@ -565,13 +608,29 @@ export default function CooldownApp() {
         )}
       </main>
 
-      <footer className="px-4 pb-10 text-center text-xs text-slate-500 sm:px-6">
-        {extensionMode
-          ? "La extensión mantiene los avisos aunque cierres esta página."
-          : "Las notificaciones con la pestaña totalmente cerrada requieren Web Push o un backend."}
+      <footer className={`px-4 text-center text-xs text-slate-500 sm:px-6 ${extensionMode ? "pb-5" : "pb-10"}`}>
+        {extensionMode ? (
+          <span className="inline-flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.12)]" />
+            Protección activa aunque cierres este popup
+          </span>
+        ) : (
+          "Las notificaciones con la pestaña totalmente cerrada requieren Web Push o un backend."
+        )}
       </footer>
 
       <ToastViewport toasts={toasts} />
+
+      {extensionMode && storageReady && !settings.privacyAccepted ? (
+        <PrivacyNotice
+          onAccept={() =>
+            setSettings((currentSettings) => ({
+              ...currentSettings,
+              privacyAccepted: true,
+            }))
+          }
+        />
+      ) : null}
 
       {showSettings ? (
         <SettingsPanel
@@ -648,14 +707,17 @@ function ActiveTabQuickBlock({ activeTab, existingSite, onBlock }) {
   const alreadyPermanent = existingSite?.mode === SITE_MODES.ALWAYS;
 
   return (
-    <section className="mb-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Pestaña activa</p>
-          <p className="mt-1 truncate text-base font-semibold text-slate-950">
+    <section className="active-tab-panel mb-3 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="flex items-center gap-3 p-3.5">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+          <GlobeIcon />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold uppercase text-slate-500">Pestaña activa</p>
+          <p className="mt-0.5 truncate text-sm font-semibold text-slate-950">
             {host || "Sin pestaña web activa"}
           </p>
-          <p className="mt-0.5 truncate text-sm text-slate-500">
+          <p className="mt-0.5 truncate text-xs text-slate-500">
             {activeTab?.title || activeTab?.url || "Abre una página http o https para capturarla."}
           </p>
         </div>
@@ -664,10 +726,10 @@ function ActiveTabQuickBlock({ activeTab, existingSite, onBlock }) {
           type="button"
           onClick={onBlock}
           disabled={!activeTab?.url || alreadyPermanent}
-          className={`inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition ${
+          className={`inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition ${
             !activeTab?.url || alreadyPermanent
               ? "cursor-not-allowed bg-slate-100 text-slate-400"
-              : "bg-rose-600 text-white hover:bg-rose-700"
+              : "bg-[#e65054] text-white shadow-sm hover:bg-[#d94146]"
           }`}
         >
           <ShieldIcon />
@@ -675,6 +737,43 @@ function ActiveTabQuickBlock({ activeTab, existingSite, onBlock }) {
         </button>
       </div>
     </section>
+  );
+}
+
+function ExtensionSummary({ summary }) {
+  return (
+    <section className="mb-3 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="grid grid-cols-3 divide-x divide-slate-100">
+        <CompactMetric label="Guardados" value={summary.total} />
+        <CompactMetric label="Bloqueados" value={summary.active} tone="rose" />
+        <CompactMetric label="Disponibles" value={summary.ready} tone="emerald" />
+      </div>
+      <div className="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/80 px-3.5 py-2.5">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase text-slate-500">Próximo disponible</p>
+          <p className="mt-0.5 truncate text-xs font-medium text-slate-700">
+            {summary.nextReady
+              ? summary.nextReady.label || hostnameFromUrl(summary.nextReady.url)
+              : "Todo listo para visitar"}
+          </p>
+        </div>
+        <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-slate-800">
+          {summary.nextReady ? formatClock(summary.nextReadyRemaining) : "Sin esperas"}
+        </span>
+      </div>
+    </section>
+  );
+}
+
+function CompactMetric({ label, value, tone = "slate" }) {
+  const valueClassName =
+    tone === "rose" ? "text-[#d94146]" : tone === "emerald" ? "text-emerald-600" : "text-slate-900";
+
+  return (
+    <div className="px-3 py-3 text-center">
+      <p className={`text-xl font-semibold ${valueClassName}`}>{value}</p>
+      <p className="mt-0.5 text-[10px] font-medium uppercase text-slate-500">{label}</p>
+    </div>
   );
 }
 
@@ -705,6 +804,25 @@ function ShieldIcon() {
         d="M10 2.25c.24 0 .48.052.7.156l5 2.36A1.25 1.25 0 0116.42 5.9v3.54c0 3.44-2.06 6.55-5.23 7.89l-.7.296a1.25 1.25 0 01-.98 0l-.7-.296C5.64 15.99 3.58 12.88 3.58 9.44V5.9c0-.484.28-.924.72-1.133l5-2.36c.22-.104.46-.156.7-.156zm3.03 6.72a.75.75 0 00-1.06-1.06L9.25 10.63 8.03 9.41a.75.75 0 00-1.06 1.06l1.75 1.75c.293.293.767.293 1.06 0l3.25-3.25z"
         clipRule="evenodd"
       />
+    </svg>
+  );
+}
+
+function BrandMark() {
+  return (
+    <svg className="h-full w-full" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+      <rect width="40" height="40" rx="9" fill="#111827" />
+      <path d="M13 13.5a10 10 0 1014 0" stroke="#F8FAFC" strokeWidth="3" strokeLinecap="round" />
+      <path d="M15.5 11.5v7M24.5 11.5v7" stroke="#5EEAD4" strokeWidth="3" strokeLinecap="round" />
+      <circle cx="29.5" cy="10.5" r="3.5" fill="#F16468" />
+    </svg>
+  );
+}
+
+function GlobeIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm4.9 5h-2.08a12 12 0 00-.72-2.64A6.04 6.04 0 0114.9 7zM10 3.55c.58.73 1.12 1.86 1.47 3.45H8.53C8.88 5.41 9.42 4.28 10 3.55zM7.9 4.36A12 12 0 007.18 7H5.1a6.04 6.04 0 012.8-2.64zM4.33 9h2.54a15.72 15.72 0 000 2H4.33a6.12 6.12 0 010-2zm.77 4h2.08c.16.96.41 1.85.72 2.64A6.04 6.04 0 015.1 13zM10 16.45c-.58-.73-1.12-1.86-1.47-3.45h2.94c-.35 1.59-.89 2.72-1.47 3.45zm1.79-5.45H8.21a13.28 13.28 0 010-2h3.58a13.28 13.28 0 010 2zm.31 4.64c.31-.79.56-1.68.72-2.64h2.08a6.04 6.04 0 01-2.8 2.64zM13.13 11a15.72 15.72 0 000-2h2.54a6.12 6.12 0 010 2h-2.54z" />
     </svg>
   );
 }

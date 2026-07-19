@@ -50,6 +50,16 @@ Desde el popup puedes bloquear directamente la pestaña activa. Al añadir un si
 
 La aplicación web y la extensión usan almacenes distintos por seguridad del navegador. Usa la exportación e importación JSON para mover tus datos entre ambas instalaciones.
 
+La primera vez que se abre la extensión se muestra una explicación del tratamiento local de URLs. El bloqueo permanece inactivo hasta que el usuario acepta expresamente este uso.
+
+## Publicación en Chrome Web Store
+
+Los textos preparados para la ficha, el propósito único, las justificaciones de permisos y la lista de recursos están en [docs/CHROME_WEB_STORE.md](docs/CHROME_WEB_STORE.md).
+
+La política que debe alojarse en una URL pública antes de enviar la extensión está en [PRIVACY.md](PRIVACY.md). Sustituye primero el marcador del correo de contacto.
+
+El icono de tienda está en `extension/icons/icon128.png`. Después de ejecutar `npm run build:extension`, comprime el contenido de `dist` de forma que `manifest.json` quede en la raíz del ZIP.
+
 ## Datos y avisos
 
 Los datos exportados contienen `version`, `items`, `settings` y `exportedAt`. La importación admite archivos de hasta 2 MB y rechaza formatos creados por una versión más reciente de la aplicación.

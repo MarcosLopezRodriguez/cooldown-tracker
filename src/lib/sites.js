@@ -43,6 +43,7 @@ export function normalizeSettings(input) {
         : typeof source.sound === "boolean"
           ? source.sound
           : DEFAULT_SETTINGS.soundOn,
+    privacyAccepted: source.privacyAccepted === true,
   };
 }
 

@@ -8,12 +8,22 @@
   </head>
   <body>
     <main>
-      <div class="mark" aria-hidden="true">CT</div>
+      <div class="mark" aria-hidden="true">
+        <svg viewBox="0 0 40 40" fill="none">
+          <rect width="40" height="40" rx="9" fill="#111827" />
+          <path d="M13 13.5a10 10 0 1014 0" stroke="#f8fafc" stroke-width="3" stroke-linecap="round" />
+          <path d="M15.5 11.5v7M24.5 11.5v7" stroke="#5eead4" stroke-width="3" stroke-linecap="round" />
+          <circle cx="29.5" cy="10.5" r="3.5" fill="#f16468" />
+        </svg>
+      </div>
       <p id="eyebrow" class="eyebrow">Cooldown activo</p>
       <h1 id="title">Esta visita está en pausa</h1>
       <p id="description">Podrás volver a intentarlo cuando termine el temporizador.</p>
       <p id="clock" class="clock" aria-live="polite">00:00:00</p>
-      <button type="button" id="back-button">Volver</button>
+      <div class="actions">
+        <button type="button" id="back-button">Volver</button>
+        <a href="index.html">Gestionar bloqueo</a>
+      </div>
     </main>
     <script src="blocked.js"></script>
   </body>

@@ -11,6 +11,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   defaultDurationMs: 30 * 60 * 1000,
   notificationsOn: false,
   soundOn: true,
+  privacyAccepted: false,
 });
 
 export const FILTER_OPTIONS = [

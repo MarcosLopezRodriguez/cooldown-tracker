@@ -25,10 +25,14 @@ export default function SiteCard({
       : "bg-amber-50 text-amber-700";
 
   return (
-    <article className="group relative overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+    <article
+      className={`site-card group relative overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition hover:border-slate-300 hover:shadow-md ${
+        extensionMode ? "extension-site-card" : "hover:-translate-y-0.5"
+      }`}
+    >
       <div className={`h-1 w-full ${view.permanent ? "bg-rose-500" : view.ready ? "bg-emerald-500" : "bg-amber-500"}`} />
 
-      <div className="p-4">
+      <div className={extensionMode ? "p-3.5" : "p-4"}>
         <div className="flex items-start gap-4">
           <FaviconBadge src={item.favicon} label={item.label || view.host} />
 
@@ -67,7 +71,7 @@ export default function SiteCard({
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+        <div className="site-actions mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
           <a
             href={item.url}
             target="_blank"
