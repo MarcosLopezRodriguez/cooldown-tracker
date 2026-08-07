@@ -830,10 +830,10 @@ function ShieldIcon() {
 function BrandMark() {
   return (
     <svg className="h-full w-full" viewBox="0 0 40 40" fill="none" aria-hidden="true">
-      <rect width="40" height="40" rx="9" fill="#111827" />
-      <path d="M13 13.5a10 10 0 1014 0" stroke="#F8FAFC" strokeWidth="3" strokeLinecap="round" />
-      <path d="M15.5 11.5v7M24.5 11.5v7" stroke="#5EEAD4" strokeWidth="3" strokeLinecap="round" />
-      <circle cx="29.5" cy="10.5" r="3.5" fill="#F16468" />
+      <rect x="5" y="5" width="30" height="30" rx="8.125" fill="#111827" />
+      <path d="M12.27 14.14C10 19.38 11.02 25.47 15.16 28.91C19.06 32.11 24.77 32.03 28.59 28.83C31.02 26.8 32.34 23.98 32.34 21.02" stroke="#F8FAFC" strokeWidth="2.97" strokeLinecap="round" />
+      <path d="M17.5 14.69V21.72M22.97 14.69V21.72" stroke="#5EEAD4" strokeWidth="2.81" strokeLinecap="round" />
+      <circle cx="30.78" cy="16.02" r="2.89" fill="#F16468" />
     </svg>
   );
 }

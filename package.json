@@ -2,6 +2,7 @@
   "name": "cooldown-tracker",
   "private": true,
   "version": "1.0.0",
+  "packageManager": "npm@12.0.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -25,5 +26,12 @@
     "globals": "^15.10.0",
     "tailwindcss": "^3.4.14",
     "vite": "^6.4.3"
+  },
+  "engines": {
+    "node": "^24.15.0",
+    "npm": "^12.0.0"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true
   }
 }

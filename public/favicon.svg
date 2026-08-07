@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
-  <rect width="512" height="512" rx="112" fill="#111827" />
-  <path d="M165 173c0 95 74 174 166 174 58 0 111-31 141-81" stroke="#f8fafc" stroke-width="42" stroke-linecap="round" />
-  <path d="M197 146v92M315 146v92" stroke="#5eead4" stroke-width="42" stroke-linecap="round" />
-  <circle cx="378" cy="137" r="46" fill="#f16468" />
+  <title>Cooldown Tracker</title>
+  <rect x="64" y="64" width="384" height="384" rx="104" fill="#111827"/>
+  <path d="M157 181C128 248 141 326 194 370C244 411 317 410 366 369C397 343 414 307 414 269" stroke="#F8FAFC" stroke-width="38" stroke-linecap="round"/>
+  <path d="M224 188V278M294 188V278" stroke="#5EEAD4" stroke-width="36" stroke-linecap="round"/>
+  <circle cx="394" cy="205" r="37" fill="#F16468"/>
 </svg>
