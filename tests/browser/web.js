@@ -1,0 +1,55 @@
+async (page, config) => {
+  const passed=[];
+  const check=(ok,message)=>{if(!ok)throw new Error(message);};
+  const I='cooldown_site_timers_v1',S='cooldown_settings_v1';
+  await page.goto(config.baseUrl);
+  await page.evaluate(S=>localStorage.setItem(S,JSON.stringify({language:'es',soundOn:true})),S);
+  await page.reload();
+  await page.getByRole('heading',{name:'Cooldown Tracker',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Nuevo sitio',exact:true}).focus();
+  await page.keyboard.press('Enter');
+  await page.getByRole('textbox',{name:'URL del sitio'}).fill('https://example.com/path');
+  await page.getByRole('textbox',{name:/Nombre personalizado/}).fill('Regresión web');
+  await page.getByRole('spinbutton',{name:'Tiempo de cooldown'}).fill('2');
+  await page.getByRole('button',{name:'Añadir sitio',exact:true}).click();
+  await page.getByRole('heading',{name:'Regresión web',exact:true}).waitFor();
+  await page.reload();await page.getByRole('heading',{name:'Regresión web',exact:true}).waitFor();passed.push('añadir y persistir');
+  await page.getByRole('button',{name:'Editar sitio'}).click();
+  await page.getByRole('textbox',{name:/Nombre personalizado/}).fill('Web editada');
+  await page.getByRole('button',{name:'Guardar cambios',exact:true}).click();
+  await page.getByRole('heading',{name:'Web editada',exact:true}).waitFor();passed.push('editar');
+  await page.getByRole('button',{name:'Marcar visitado'}).click();
+  await page.getByRole('button',{name:'Liberar',exact:true}).waitFor();passed.push('iniciar cooldown');
+  await page.getByRole('button',{name:'Liberar',exact:true}).click();
+  await page.getByRole('button',{name:'Marcar visitado'}).waitFor();
+  const timerContext=await page.context().browser().newContext();
+  const expiry=await timerContext.newPage();
+  const fixture=await page.evaluate(({I,S})=>({items:localStorage.getItem(I),settings:localStorage.getItem(S)}),{I,S});
+  await expiry.goto(config.baseUrl);
+  await expiry.evaluate(({I,S,fixture})=>{localStorage.setItem(I,fixture.items);localStorage.setItem(S,fixture.settings);},{I,S,fixture});
+  await expiry.clock.install();await expiry.reload();
+  await expiry.getByRole('button',{name:'Marcar visitado'}).click();
+  await expiry.clock.fastForward(121000);
+  await expiry.getByRole('button',{name:'Marcar visitado'}).waitFor();
+  check(await expiry.evaluate(I=>JSON.parse(localStorage.getItem(I))[0].endAt,I)===null,'Caducidad web sin persistir');
+  await timerContext.close();passed.push('caducar en versión web');
+  await page.getByRole('button',{name:'Abrir configuración'}).focus();await page.keyboard.press('Enter');
+  const dialog=page.getByRole('dialog');
+  check(await page.getByRole('button',{name:'Cerrar configuración'}).evaluate(el=>el===document.activeElement),'Foco inicial de ajustes');
+  await page.getByRole('spinbutton',{name:'Duración por defecto'}).focus();await page.keyboard.press('ControlOrMeta+A');await page.keyboard.type('7');await page.keyboard.press('Tab');
+  check(await page.getByRole('spinbutton',{name:'Duración por defecto'}).inputValue()==='7','Duración accesible');passed.push('duración con nombre y teclado');
+  const sound=page.getByRole('switch',{name:'Sonido',exact:true});
+  check(await sound.getAttribute('aria-checked')==='true','Estado inicial del interruptor');
+  await sound.focus();await page.keyboard.press('Space');
+  check(await sound.getAttribute('aria-checked')==='false','Estado del interruptor sin actualizar');passed.push('interruptor con nombre, estado y teclado');
+  for(let i=0;i<22;i++){
+    await page.keyboard.press('Tab');
+    check(await dialog.evaluate(el=>el.contains(document.activeElement)),'Tab salió del diálogo');
+  }
+  await page.getByRole('button',{name:'Cerrar configuración'}).focus();await page.keyboard.press('Shift+Tab');
+  check(await page.getByRole('button',{name:'Importar datos',exact:true}).evaluate(el=>el===document.activeElement),'Shift+Tab no vuelve al último control');passed.push('Tab y Shift+Tab en ajustes');
+  const downloadEvent=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Exportar datos',exact:true}).focus();await page.keyboard.press('Enter');
+  const backup=config.output+'/web-backup.json';await(await downloadEvent).saveAs(backup);passed.push('exportar con teclado');
+  return {passed,upload:backup};
+}

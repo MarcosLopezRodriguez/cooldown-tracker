@@ -15,7 +15,7 @@ function getFocusableNodes(container) {
   }
 
   return Array.from(container.querySelectorAll(FOCUSABLE_SELECTOR)).filter(
-    (node) => node instanceof HTMLElement && !node.hasAttribute("aria-hidden"),
+    (node) => node instanceof HTMLElement && !node.hasAttribute("aria-hidden") && node.tabIndex >= 0 && node.getClientRects().length > 0,
   );
 }
 
@@ -26,6 +26,7 @@ export default function DialogShell({
   descriptionId,
   variant = "modal",
   initialFocusRef,
+  returnFocusRef,
   closeOnBackdrop = true,
   panelClassName = "",
 }) {
@@ -42,7 +43,7 @@ export default function DialogShell({
   }, [onClose]);
 
   useEffect(() => {
-    const previousActiveElement = document.activeElement;
+    const previousActiveElement = returnFocusRef?.current || document.activeElement;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
@@ -87,11 +88,11 @@ export default function DialogShell({
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = previousOverflow;
-      if (previousActiveElement instanceof HTMLElement) {
+      if (previousActiveElement instanceof HTMLElement && previousActiveElement.isConnected) {
         previousActiveElement.focus({ preventScroll: true });
       }
     };
-  }, [initialFocusRef]);
+  }, [initialFocusRef, returnFocusRef]);
 
   const basePanelClassName =
     variant === "side"

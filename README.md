@@ -8,7 +8,7 @@ Cooldown Tracker registra pausas entre visitas a sitios frecuentes. Puede usarse
 - Inicia el temporizador al abrir un sitio desde la aplicación o al marcar una visita.
 - Filtra, busca y ordena los sitios por estado.
 - Exporta e importa datos en JSON versionado.
-- Muestra avisos y sonido mientras la aplicación está abierta.
+- En la versión web, muestra avisos y sonido mientras la aplicación está abierta.
 - En la extensión de Chrome, bloquea la navegación de sitios en cooldown o con bloqueo permanente y avisa incluso si la página de la aplicación está cerrada.
 - Incluye español, inglés, francés, alemán, italiano, polaco, chino y ruso. El modo `Automático` sigue el idioma de Chrome y también puede cambiarse manualmente desde la configuración.
 
@@ -51,6 +51,8 @@ Al abrir un sitio desde la extensión, esa visita queda permitida y reinicia su 
 
 Desde el popup puedes bloquear directamente la pestaña activa. Al añadir un sitio puedes elegir entre `Bloqueo permanente` y `Cooldown temporal`; el modo permanente queda activo hasta que lo desactives manualmente.
 
+El bloqueo rápido reconoce las reglas de un dominio padre desde sus subdominios. Las URLs exactas incluyen query y fragmento y se comprueban también al cambiar una ruta mediante History API. La pantalla bloqueada refleja cambios de reglas y duraciones sin recarga manual. La precedencia y los casos cubiertos están documentados en [la guía de validación](docs/VALIDATION.md).
+
 La aplicación web y la extensión usan almacenes distintos por seguridad del navegador. Usa la exportación e importación JSON para mover tus datos entre ambas instalaciones.
 
 La primera vez que se abre la extensión se muestra una explicación del tratamiento local de URLs. El bloqueo permanece inactivo hasta que el usuario acepta expresamente este uso.
@@ -67,7 +69,11 @@ El icono de tienda está en `extension/icons/icon128.png`. Después de ejecutar 
 
 Los datos exportados contienen `version`, `items`, `settings` y `exportedAt`. La importación admite archivos de hasta 2 MB y rechaza formatos creados por una versión más reciente de la aplicación.
 
+Exporta una copia antes de sustituir datos. La importación valida todo el archivo, rechaza filas y ámbitos duplicados y muestra una vista previa antes de confirmar. Puedes cancelar sin cambios. La aceptación de privacidad pertenece a cada instalación y no se transfiere en una copia. Ante un fallo de almacenamiento se puede exportar lo que aparece en pantalla y reintentar; una lectura fallida protege los originales.
+
 Los avisos de la extensión se programan con alarmas de Chrome. Para recibirlos, activa la opción de notificaciones desde la configuración de la aplicación y concede el permiso correspondiente.
+
+El trabajador coordina las escrituras de las distintas interfaces y es responsable de finalizar los temporizadores y crear sus avisos, también tras reiniciarse. El sonido personalizado corresponde a la versión web; en la extensión, Chrome y el sistema controlan el sonido de las notificaciones.
 
 ## Comandos disponibles
 
@@ -79,10 +85,14 @@ npm run preview
 npm run lint
 npm test
 npm run check:extension
+npm run check
+npm run test:browser
 ```
 
 `npm test` ejecuta las regresiones de reglas, temporizadores, importación/exportación e idiomas.
 Después de `npm run build:extension`, `npm run check:extension` comprueba el manifiesto, las entradas empaquetadas, los iconos y los ocho catálogos de Chrome.
+
+`npm run check` reúne la validación del entorno, análisis, pruebas y ambas compilaciones. `npm run test:browser` usa Playwright CLI y una extensión real en un perfil temporal. La instalación del navegador, CI, evidencias y comprobación del paquete se explican en [docs/VALIDATION.md](docs/VALIDATION.md). Las convenciones de mantenimiento están en [AGENTS.md](AGENTS.md).
 
 El proyecto usa React 19, Vite 8 y Tailwind CSS 4 mediante `@tailwindcss/vite`; no requiere Autoprefixer ni configuración PostCSS adicional. ESLint 10 reconoce JSX de forma nativa. Las versiones directas están fijadas y `package-lock.json` permite reinstalar con `npm ci`.
 

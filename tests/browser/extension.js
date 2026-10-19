@@ -1,0 +1,136 @@
+async (page, config) => {
+  const passed=[];
+  const until=async(fn,arg,timeout=15000,view=page)=>{const limit=Date.now()+timeout;while(Date.now()<limit){if(await view.evaluate(fn,arg))return;await new Promise(resolve=>setTimeout(resolve,100));}throw Error('No se cumplió la condición de Chrome dentro del plazo');};
+
+  const checkpoint=async(...labels)=>{passed.push(...labels);await page.evaluate(notes=>{window.browserTestProgress=notes;},passed);};
+  const check=(ok,message)=>{if(!ok)throw new Error(message);};
+  const I='cooldown_site_timers_v1';
+  const context=page.context();
+  let serial=0;
+  const command=async(cmd,view=page)=>view.evaluate(async ({command,requestId})=>{
+    const response=await chrome.runtime.sendMessage({type:'state-mutate',command,requestId});
+    if(!response.ok)throw new Error(response.error);return response.state;
+  },{command:cmd,requestId:'browser-'+Date.now()+'-'+(++serial)});
+  const site=(id,label,extra={})=>({id,label,url:config.baseUrl+'/'+id,scope:'domain',mode:'cooldown',durationMs:60000,endAt:null,...extra});
+  await page.goto(config.extensionUrl);
+  await page.getByRole('button',{name:'Aceptar y activar'}).waitFor();
+  const worker=context.serviceWorkers()[0];
+  await worker.evaluate(()=>{
+    globalThis.checkCounts={query:0,update:0,alarm:0,notify:0};
+    for(const [namespace,key,count]of[['tabs','query','query'],['tabs','update','update'],['alarms','create','alarm'],['notifications','create','notify']]){
+      const fn=chrome[namespace][key].bind(chrome[namespace]);chrome[namespace][key]=(...args)=>{globalThis.checkCounts[count]++;return fn(...args);};
+    }
+  });
+  await command({kind:'import',hasItems:true,items:[site('inactive','Inactiva',{mode:'always'})],settings:{language:'es'}});
+  const target=await context.newPage();await target.goto(config.baseUrl+'/inactive');
+  check(Object.values(await worker.evaluate(()=>globalThis.checkCounts)).every(n=>n===0),'Actividad sin aceptación');await checkpoint('instalación limpia e inactividad sin aceptación');
+  await page.getByRole('button',{name:'Aceptar y activar'}).click();
+  await target.waitForURL('**/blocked.html?**',{waitUntil:'commit'}).catch(error=>{if(!target.url().includes('/blocked.html'))throw error;});
+  await target.getByRole('heading',{name:'inactive',exact:false}).count();
+  await page.getByRole('heading',{name:'Inactiva',exact:true}).waitFor();await checkpoint('activación expresa y bloqueo real');
+  await command({kind:'patch',upserts:[{id:'inactive',fields:{mode:'cooldown',endAt:Date.now()+120000}}]});
+  await target.waitForFunction(()=>/^00:01:|^00:02:/.test(document.querySelector('#clock').textContent));
+  await command({kind:'patch',upserts:[{id:'inactive',fields:{endAt:Date.now()+300000}}]});
+  await target.waitForFunction(()=>/^00:04:|^00:05:/.test(document.querySelector('#clock').textContent));await checkpoint('contador actualiza al acortar y ampliar');
+  await command({kind:'patch',upserts:[{id:'inactive',fields:{mode:'always',endAt:null}}]});
+  await target.getByText('Bloqueado',{exact:true}).waitFor();await checkpoint('cambio temporal a permanente en pantalla bloqueada');
+  await page.getByRole('button',{name:'Desbloquear',exact:true}).click();
+  await target.getByRole('button',{name:'Volver al sitio',exact:true}).waitFor();await checkpoint('liberar desde popup actualiza pestaña bloqueada');
+  await command({kind:'import',hasItems:true,items:[site('domain','Dominio padre',{mode:'always'}),site('exact','Exacta',{scope:'exact',mode:'always',url:config.baseUrl+'/target'})],settings:{}});
+  await target.goto(config.baseUrl+'/target').catch(error=>{if(!error.message.includes('ERR_ABORTED'))throw error;});
+  await target.waitForURL('**/blocked.html?**',{waitUntil:'commit'}).catch(error=>{if(!target.url().includes('/blocked.html'))throw error;});
+  await target.getByRole('heading',{name:/Exacta/}).waitFor();
+  await command({kind:'patch',deletes:['exact']});
+  await target.getByRole('heading',{name:/Dominio padre/}).waitFor();
+  check(await target.getByRole('button',{name:'Volver al sitio',exact:true}).count()===0,'Se ofreció acceso con otra regla activa');await checkpoint('precedencia exacta y regla alternativa sin acceso incorrecto');
+  await command({kind:'patch',deletes:['domain']});
+  await target.getByRole('button',{name:'Volver al sitio',exact:true}).waitFor();await checkpoint('borrar regla actualiza pestaña bloqueada');
+  const parentUrl=config.baseUrl.replace('127.0.0.1','cooldown.test')+'/';
+  const subUrl=config.baseUrl.replace('127.0.0.1','sub.cooldown.test')+'/allowed';
+  await command({kind:'import',hasItems:true,items:[site('parent','Dominio padre',{url:parentUrl})],settings:{}});
+  await target.goto(subUrl);await target.bringToFront();await page.reload();
+  await page.getByRole('button',{name:'Bloquear pestaña',exact:true}).click();
+  await target.waitForURL('**/blocked.html?**',{waitUntil:'commit'}).catch(error=>{if(!target.url().includes('/blocked.html'))throw error;});
+  const quick=await page.evaluate(I=>chrome.storage.local.get(I).then(v=>v[I]),I);
+  check(quick.length===1&&quick[0].id==='parent'&&quick[0].mode==='always','Bloqueo rápido duplicó dominio padre');await checkpoint('bloqueo rápido reconoce dominio padre desde subdominio');
+  const opened=context.waitForEvent('page');await page.getByRole('link',{name:'Abrir una vez',exact:true}).click();
+  const allowed=await opened;await allowed.waitForURL(parentUrl);
+  await allowed.evaluate(()=>history.pushState({},'','/via-history#one'));
+  await allowed.waitForURL(parentUrl+'via-history#one');
+  check(!allowed.url().includes('/blocked.html'),'Excepción de apertura perdió el permiso');await allowed.close();await checkpoint('abrir una vez conserva excepción en History API');
+  await command({kind:'import',hasItems:true,items:[site('spa','Ruta exacta',{scope:'exact',mode:'always',url:config.baseUrl+'/blocked?q=1#one'})],settings:{}});
+  async function checkInternal(action){
+    await target.goto(config.baseUrl+'/allowed');
+    await target.evaluate(action);
+    await target.waitForURL('**/blocked.html?**',{waitUntil:'commit'}).catch(error=>{if(!target.url().includes('/blocked.html'))throw error;});
+    await target.getByRole('heading',{name:/Ruta exacta/}).waitFor();
+  }
+  await checkInternal(()=>history.pushState({},'','/blocked?q=1#one'));await checkpoint('pushState activa bloqueo exacto');
+  await checkInternal(()=>history.replaceState({},'','/blocked?q=1#one'));await checkpoint('replaceState activa bloqueo exacto');
+  await target.goto(config.baseUrl+'/blocked?q=2#one');
+  await target.getByRole('heading',{name:'Cooldown Tracker',exact:true}).waitFor();
+  await target.goto(config.baseUrl+'/blocked?q=1#two');
+  await target.getByRole('heading',{name:'Cooldown Tracker',exact:true}).waitFor();
+  await target.evaluate(()=>{location.hash='one';});
+  await target.waitForURL('**/blocked.html?**',{waitUntil:'commit'}).catch(error=>{if(!target.url().includes('/blocked.html'))throw error;});await checkpoint('query y fragmento distinguen URL exacta');
+  await target.goto(config.baseUrl+'/allowed');
+  await target.evaluate(()=>{history.pushState({},'','/blocked?q=1#one');history.pushState({},'','/allowed-after');});
+  await target.waitForURL('**/blocked.html?**',{waitUntil:'commit'}).catch(error=>{if(!target.url().includes('/blocked.html'))throw error;});
+  await command({kind:'patch',deletes:['spa']});await target.getByRole('button',{name:'Volver al sitio',exact:true}).waitFor();
+  await target.getByRole('button',{name:'Volver al sitio',exact:true}).click();
+  await target.getByRole('heading',{name:'Cooldown Tracker',exact:true}).waitFor();await checkpoint('regreso al destino comprueba reglas vigentes');
+  // History entries created while disabled remain subject to rules on back/forward.
+  await target.goto(config.baseUrl+'/allowed');
+  await target.evaluate(()=>{history.pushState({},'','/history-blocked');history.pushState({},'','/history-safe');});
+  await command({kind:'import',hasItems:true,items:[site('history','Atrás bloqueado',{scope:'exact',mode:'always',url:config.baseUrl+'/history-blocked'})],settings:{}});
+  await target.goBack().catch(error=>{if(!error.message.includes('ERR_ABORTED'))throw error;});
+  await target.waitForURL('**/blocked.html?**',{waitUntil:'commit'}).catch(error=>{if(!target.url().includes('/blocked.html'))throw error;});await checkpoint('atrás aplica reglas de navegación interna');
+  await command({kind:'import',hasItems:true,items:[],settings:{}});
+  await target.goto(config.baseUrl+'/forward-base');
+  await target.evaluate(()=>{history.pushState({},'','/forward-blocked');history.back();});
+  await target.waitForURL(config.baseUrl+'/forward-base');
+  await command({kind:'import',hasItems:true,items:[site('forward','Adelante bloqueado',{scope:'exact',mode:'always',url:config.baseUrl+'/forward-blocked'})],settings:{}});
+  await target.goForward().catch(error=>{if(!error.message.includes('ERR_ABORTED'))throw error;});
+  await target.waitForURL('**/blocked.html?**',{waitUntil:'commit'}).catch(error=>{if(!target.url().includes('/blocked.html'))throw error;});await checkpoint('adelante aplica reglas de navegación interna');
+  await command({kind:'import',hasItems:true,items:[site('a','Ventana A',{url:'https://a.example.test/'}),site('b','Ventana B',{url:'https://b.example.test/'})],settings:{}});
+  const second=await context.newPage();await second.goto(config.extensionUrl);
+  await page.getByRole('heading',{name:'Ventana A',exact:true}).waitFor();
+  await second.getByRole('heading',{name:'Ventana A',exact:true}).waitFor();
+  const firstCard=page.getByRole('article').filter({has:page.getByRole('heading',{name:'Ventana A',exact:true})});
+  const secondCard=second.getByRole('article').filter({has:second.getByRole('heading',{name:'Ventana A',exact:true})});
+  await firstCard.getByRole('button',{name:'Editar sitio'}).click();
+  await secondCard.getByRole('button',{name:'Editar sitio'}).click();
+  await page.getByRole('textbox',{name:/Nombre personalizado/}).fill('Nombre en primera');
+  await second.getByRole('spinbutton',{name:'Tiempo de cooldown'}).fill('3');
+  await Promise.all([page.getByRole('button',{name:'Guardar cambios',exact:true}).click(),second.getByRole('button',{name:'Guardar cambios',exact:true}).click()]);
+  await until(I=>chrome.storage.local.get(I).then(v=>v[I].find(item=>item.id==='a')?.label==='Nombre en primera'&&v[I].find(item=>item.id==='a')?.durationMs===180000),I);
+  await checkpoint('dos interfaces editan campos distintos sin perder cambios');
+  await page.getByRole('article').filter({has:page.getByRole('heading',{name:'Nombre en primera',exact:true})}).getByRole('button',{name:'Editar sitio'}).click();
+  await page.getByRole('textbox',{name:/Nombre personalizado/}).fill('Edición obsoleta');
+  await second.getByRole('article').filter({has:second.getByRole('heading',{name:'Nombre en primera',exact:true})}).getByRole('button',{name:'Eliminar sitio'}).click();
+  await second.getByRole('dialog').getByRole('button',{name:'Eliminar',exact:true}).click();
+  await until(I=>chrome.storage.local.get(I).then(v=>!v[I].some(item=>item.id==='a')),I);
+  await page.getByRole('button',{name:'Guardar cambios',exact:true}).click();
+  await page.getByRole('alert').filter({hasText:'Otra ventana ha eliminado esta regla.'}).waitFor();
+  await page.keyboard.press('Escape');
+  check(await page.evaluate(I=>chrome.storage.local.get(I).then(v=>v[I].length),I)===1,'Reapareció regla borrada');await second.close();await checkpoint('edición obsoleta no recupera una regla borrada');
+  // Real simultaneous alarms with both interfaces open.
+  const deadline=Date.now()+3000;
+  await command({kind:'import',hasItems:true,items:[site('one','Fin uno',{url:'https://one.example.test/',endAt:deadline}),site('two','Fin dos',{url:'https://two.example.test/',endAt:deadline})],settings:{notificationsOn:true}});
+  await until(I=>chrome.storage.local.get(I).then(v=>v[I].length===2&&v[I].every(item=>item.endAt===null)),I);
+  await until(()=>chrome.notifications.getAll().then(notices=>Object.keys(notices).filter(id=>id.startsWith('cooldown-ready:one:')||id.startsWith('cooldown-ready:two:')).length===2));
+  const notices=await page.evaluate(()=>chrome.notifications.getAll());
+  check(Object.keys(notices).filter(id=>id.startsWith('cooldown-ready:one:')||id.startsWith('cooldown-ready:two:')).length===2,'Avisos simultáneos incorrectos');await checkpoint('dos alarmas reales con interfaz abierta finalizan y avisan una vez');
+  const beforeNotices=await worker.evaluate(()=>globalThis.checkCounts.notify);
+  await page.reload();await page.getByRole('heading',{name:'Fin uno',exact:true}).waitFor();
+  const reopened=await context.newPage();await reopened.goto(config.extensionUrl);await reopened.getByRole('heading',{name:'Fin dos',exact:true}).waitFor();await reopened.close();
+  check(await worker.evaluate(()=>globalThis.checkCounts.notify)===beforeNotices,'Recarga o reapertura duplicó avisos');await checkpoint('recarga y reapertura no duplican avisos');
+  // Accessible settings and import flow in extension.
+  await page.getByRole('button',{name:'Abrir configuración'}).focus();await page.keyboard.press('Enter');
+  await page.getByRole('switch',{name:'Notificaciones',exact:true}).waitFor();
+  check(await page.getByRole('switch',{name:'Sonido',exact:true}).isDisabled(),'Sonido personalizado no disponible debe estar desactivado');
+  await page.getByText(/El sonido personalizado funciona en la versión web/).waitFor();await checkpoint('sonido explica su disponibilidad real');
+  await page.getByRole('button',{name:'Cerrar configuración'}).focus();await page.keyboard.press('Shift+Tab');
+  check(await page.getByRole('button',{name:'Importar datos',exact:true}).evaluate(el=>el===document.activeElement),'Trap de teclado del popup');
+  return {passed,uploadValue:{settings:{soundOn:false,privacyAccepted:false}},contextData:{beforeNotices},notificationIds:Object.keys(notices)};
+}

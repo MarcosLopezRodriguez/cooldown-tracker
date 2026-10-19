@@ -3,6 +3,10 @@ node_modules/
 
 # Build files
 dist/
+dist-web/
+artifacts/
+output/
+.playwright-cli/
 *.zip
 
 # Environment variables

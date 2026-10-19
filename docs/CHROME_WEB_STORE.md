@@ -74,5 +74,8 @@ Es necesario para comparar dominios y URLs visitadas con la lista local de bloqu
 - Tile promocional obligatorio: `store-assets/small-promo-440x280.png`, sin texto para servir a todos los idiomas.
 - Marquee opcional: `store-assets/marquee-1400x560.png`, con fuente en `store-assets/marquee-source.svg`.
 - Capturas: entre 1 y 5 imágenes de `1280x800` o `640x400`.
+- Preparadas y revisadas: `store-assets/screenshots/extension-overview.png` y `extension-settings.png`, de 1280×800. Son composiciones de dos vistas reales de la extensión con datos de demostración.
 
-Antes de publicar, aloja `PRIVACY.md` en una URL pública y estable.
+La [política de privacidad pública](https://raw.githubusercontent.com/MarcosLopezRodriguez/cooldown-tracker/refs/heads/web-extension-mode/PRIVACY.md) respondió HTTP 200 el 19 de octubre de 2026. Su fuente es `PRIVACY.md`; comprueba de nuevo la disponibilidad antes de enviar la extensión.
+
+La entrega se identifica con `artifacts/extension-1.0.0.json`, generado por `npm run check:extension`, que contiene la versión y las huellas SHA-256 de todos los archivos de `dist`. El informe de las mejoras y pruebas está en `docs/IMPORTANT_IMPROVEMENTS_2026-10-19.md`. Sigue [la guía de validación](VALIDATION.md) antes de preparar el ZIP. La configuración de CI genera los paquetes y sus informes; no publica en Chrome Web Store.

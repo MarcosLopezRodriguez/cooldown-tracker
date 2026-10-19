@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
-import { loadStoredState, saveStoredState, StorageReadError } from "../src/lib/storage.js";
+import { loadStoredState, saveStoredState, importStoredState, discardPendingRecovery, StorageReadError } from "../src/lib/storage.js";
 import { LS_KEY, LS_SETTINGS_KEY } from "../src/lib/constants.js";
 
-afterEach(() => { delete globalThis.window; delete globalThis.chrome; delete globalThis.location; });
+afterEach(() => { discardPendingRecovery(); delete globalThis.window; delete globalThis.chrome; delete globalThis.location; });
 const original = { id: "original", url: "https://example.com/", durationMs: 60_000 };
 function web(items = [original], settings = { language: "es" }) {
   const data = new Map([[LS_KEY, JSON.stringify(items)], [LS_SETTINGS_KEY, JSON.stringify(settings)]]);
@@ -56,7 +56,7 @@ test("un fallo parcial de guardado restaura ambas claves y permite reintentar", 
 test("chrome.storage con lastError no escribe defaults y se recupera tras reintentar", async () => {
   globalThis.location = { protocol: "chrome-extension:" };
   const writes = [];
-  const runtime = { id: "test" };
+  const runtime = { id: "test", sendMessage: (_message, callback) => callback({ ok: true, state: { items: [original], settings: { language: "es" } } }) };
   let failed = true;
   globalThis.chrome = { runtime, storage: { local: {
     get: (_keys, callback) => {
@@ -71,22 +71,24 @@ test("chrome.storage con lastError no escribe defaults y se recupera tras reinte
   failed = false;
   assert.equal((await loadStoredState()).items[0].id, "original");
 });
-test("la importación se guarda después del autoguardado previo y escribe las dos claves juntas", async () => {
+test("la importación se envía al coordinador después del autoguardado y no escribe snapshots", async () => {
   globalThis.location = { protocol: "chrome-extension:" };
   const calls = [];
   let release;
-  globalThis.chrome = { runtime: { id: "test" }, storage: { local: {
-    set: (values, callback) => { calls.push(values); if (calls.length === 1) release = callback; else callback(); },
-  } } };
+  globalThis.chrome = { runtime: { id: "test", sendMessage: (message, callback) => {
+    calls.push(message); const ack = () => callback({ ok: true, state: { items: [], settings: { language: "en" } } });
+    if (calls.length === 1) release = ack; else ack();
+  } }, storage: { local: { set: () => { throw new Error("La interfaz no debe escribir directamente"); } } } };
   const first = saveStoredState({ items: [original], settings: { language: "es" } });
-  const second = saveStoredState({ items: [], settings: { language: "en" } });
+  const second = importStoredState({ items: [], settings: { language: "en" } }, { hasItems: true, items: [], settingsPatch: { language: "en" } });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(calls.length, 1);
   release();
   await Promise.all([first, second]);
   assert.equal(calls.length, 2);
-  assert.deepEqual(Object.keys(calls[1]), [LS_KEY, LS_SETTINGS_KEY]);
-  assert.deepEqual(calls[1][LS_KEY], []);
+  assert.equal(calls[1].type, "state-mutate");
+  assert.equal(calls[1].command.kind, "import");
+  assert.deepEqual(calls[1].command.items, []);
 });
 test("guardar solo ajustes conserva reglas actualizadas por el proceso de fondo", async () => {
   const { data } = web();

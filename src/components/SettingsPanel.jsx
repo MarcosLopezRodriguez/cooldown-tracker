@@ -3,6 +3,7 @@ import DialogShell from "./DialogShell.jsx";
 import DurationInput from "./DurationInput.jsx";
 import { LANGUAGE_OPTIONS } from "../../extension/i18n.js";
 import { useI18n } from "../i18n/context.js";
+import { isExtensionContext } from "../lib/utils.js";
 
 export default function SettingsPanel({
   settings,
@@ -13,9 +14,12 @@ export default function SettingsPanel({
   onToggleNotifications,
   notifSupported,
   permission,
+  returnFocusRef,
 }) {
   const { t } = useI18n();
   const closeButtonRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const extensionMode = isExtensionContext();
   const [importMessage, setImportMessage] = useState(null);
 
   const defaultMinutes = Math.max(1, Math.round(settings.defaultDurationMs / 60000));
@@ -58,6 +62,7 @@ export default function SettingsPanel({
       descriptionId="settings-description"
       onClose={onClose}
       initialFocusRef={closeButtonRef}
+      returnFocusRef={returnFocusRef}
       panelClassName="max-w-lg"
     >
       <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
@@ -117,6 +122,7 @@ export default function SettingsPanel({
           </div>
           <DurationInput
             inputId="default-duration"
+            label={t("defaultDuration")}
             minutes={defaultMinutes}
             onChangeMinutes={(minutes) =>
               setSettings((currentSettings) => ({
@@ -143,7 +149,7 @@ export default function SettingsPanel({
                   notificationsOn: nextValue,
                 }));
               }}
-              srLabel={t("enableNotifications")}
+              srLabel={t("notifications")}
             />
           </div>
           <p className="text-xs text-slate-500">
@@ -164,16 +170,18 @@ export default function SettingsPanel({
               <p className="mt-1 text-sm text-slate-500">{t("soundDescription")}</p>
             </div>
             <Toggle
-              checked={settings.soundOn}
+              checked={!extensionMode && settings.soundOn}
+              disabled={extensionMode}
               onClick={() =>
                 setSettings((currentSettings) => ({
                   ...currentSettings,
                   soundOn: !currentSettings.soundOn,
                 }))
               }
-              srLabel={t("enableSound")}
+              srLabel={t("sound")}
             />
           </div>
+          {extensionMode ? <p className="text-xs text-slate-500">{t("soundExtensionNote")}</p> : null}
         </section>
 
         <section className="space-y-4 px-6 py-5">
@@ -192,14 +200,15 @@ export default function SettingsPanel({
               {t("exportData")}
             </button>
 
-            <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
               <UploadIcon />
               {t("importData")}
-              <input type="file" className="hidden" accept=".json" onChange={handleImportChange} />
-            </label>
+            </button>
+            <input ref={fileInputRef} type="file" className="hidden" tabIndex={-1} aria-label={t("importData")} accept=".json" onChange={handleImportChange} />
 
             {importMessage ? (
               <p
+                role={importMessage.tone === "error" ? "alert" : "status"}
                 className={`rounded-xl px-3 py-2 text-sm ${
                   importMessage.tone === "success"
                     ? "bg-emerald-50 text-emerald-700"
@@ -220,6 +229,8 @@ function Toggle({ checked, disabled = false, onClick, srLabel }) {
   return (
     <button
       type="button"
+      role="switch"
+      aria-checked={checked}
       onClick={onClick}
       disabled={disabled}
       className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition ${

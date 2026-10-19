@@ -11,7 +11,11 @@
     "preview": "vite preview",
     "lint": "eslint . --max-warnings 0",
     "test": "node --test",
-    "check:extension": "node scripts/validate-extension.mjs"
+    "check:extension": "node scripts/validate-extension.mjs",
+    "build:web": "vite build --outDir dist-web",
+    "check:runtime": "node scripts/check-runtime.mjs",
+    "check": "npm run check:runtime && npm run lint && npm test && npm run build:web && npm run build:extension && npm run check:extension",
+    "test:browser": "node scripts/browser-smoke.mjs"
   },
   "dependencies": {
     "react": "19.3.1",
@@ -19,6 +23,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/cli": "0.1.22",
     "@tailwindcss/vite": "4.3.3",
     "@vitejs/plugin-react": "6.1.2",
     "eslint": "10.13.0",

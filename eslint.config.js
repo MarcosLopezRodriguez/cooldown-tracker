@@ -5,7 +5,7 @@ import { reactRefresh } from "eslint-plugin-react-refresh";
 
 export default [
   {
-    ignores: ["dist/**", "coverage/**", "node_modules/**", "output/**", ".playwright-cli/**"],
+    ignores: ["dist/**", "dist-web/**", "artifacts/**", "coverage/**", "node_modules/**", "output/**", ".playwright-cli/**"],
   },
   js.configs.recommended,
   {
@@ -44,5 +44,9 @@ export default [
     languageOptions: {
       globals: globals.node,
     },
+  },
+  {
+    files: ["tests/browser/**/*.js"],
+    languageOptions: { globals: { ...globals.browser, ...globals.node, chrome: "readonly" } },
   },
 ];

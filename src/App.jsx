@@ -22,6 +22,9 @@ import {
 } from "./lib/sites.js";
 import {
   loadStoredState,
+  importStoredState,
+  hasPendingRecovery,
+  discardPendingRecovery,
   saveStoredState,
   subscribeToExtensionState,
   usesExtensionStorage,
@@ -32,6 +35,8 @@ import { useToasts } from "./hooks/useToasts.js";
 import { createTranslator, resolveLocale } from "../extension/i18n.js";
 import { I18nProvider } from "./i18n/I18nContext.jsx";
 import { useI18n } from "./i18n/context.js";
+import { findMatchingRule } from "../extension/lib/rules.js";
+import { mergeSiteEdit } from "../extension/lib/operations.js";
 
 export default function CooldownApp() {
   const [initialNow] = useState(() => Date.now());
@@ -70,6 +75,7 @@ export default function CooldownApp() {
   const itemsRef = useRef(items);
   const settingsRef = useRef(settings);
   const tRef = useRef(t);
+  const settingsTriggerRef = useRef(null);
   const persistenceWarningShownRef = useRef(false);
   const savedStateRef = useRef(null);
   const lastQueuedStateRef = useRef(null);
@@ -130,11 +136,11 @@ export default function CooldownApp() {
     let request = 0;
     const refresh = () => {
       const version = stateVersionRef.current;
-      if (importBusyRef.current || pendingSavesRef.current) return;
+      if (importBusyRef.current || pendingSavesRef.current || hasPendingRecovery()) return;
       const currentRequest = ++request;
       loadStoredState()
         .then((state) => {
-          if (cancelled || currentRequest !== request || !state || importBusyRef.current || pendingSavesRef.current || version !== stateVersionRef.current) {
+          if (cancelled || currentRequest !== request || !state || importBusyRef.current || pendingSavesRef.current || hasPendingRecovery() || version !== stateVersionRef.current) {
             return;
           }
           savedStateRef.current = JSON.stringify(state);
@@ -186,6 +192,7 @@ export default function CooldownApp() {
     const timerId = window.setInterval(() => {
       const stamp = Date.now();
       setNow(stamp);
+      if (extensionMode) return;
       const { items: nextItems, completed } = resolveExpiredCooldowns(itemsRef.current, stamp);
       if (!completed.length) {
         return;
@@ -224,7 +231,7 @@ export default function CooldownApp() {
     pendingSavesRef.current += 1;
     stateVersionRef.current += 1;
     let succeeded = false;
-    void saveStoredState(state, changed)
+    void saveStoredState(state, changed, { base: previous })
       .then((saved) => {
         if (!saved) throw new Error("storageSaveError");
         savedStateRef.current = fingerprint;
@@ -235,7 +242,7 @@ export default function CooldownApp() {
         setWriteError(error);
         if (!persistenceWarningShownRef.current) {
           persistenceWarningShownRef.current = true;
-          push(t("storageSaveError"), "error");
+          push(t(["duplicateSite", "staleSite"].includes(error.message) ? error.message : "storageSaveError"), "error");
         }
       }).finally(() => {
         pendingSavesRef.current -= 1;
@@ -258,12 +265,7 @@ export default function CooldownApp() {
       return null;
     }
 
-    const activeHost = hostnameFromUrl(activeTab.url);
-    return (
-      items.find((item) => item.url === activeTab.url) ||
-      items.find((item) => item.scope === "domain" && hostnameFromUrl(item.url) === activeHost) ||
-      null
-    );
+    return findMatchingRule(items, activeTab.url, { activeOnly: true }) ?? findMatchingRule(items, activeTab.url);
   }, [activeTab, items]);
 
   const summary = useMemo(() => {
@@ -293,12 +295,14 @@ export default function CooldownApp() {
   };
 
   const commitItem = (payload, message, stamp = Date.now()) => {
+    const nextItems = upsertSite(itemsRef.current, payload, stamp);
     setNow(stamp);
-    setItems((currentItems) => upsertSite(currentItems, payload, stamp));
+    setItems(nextItems);
     push(message, "success");
   };
 
   const handleSaveItem = async (payload) => {
+    if (editing) payload = mergeSiteEdit(itemsRef.current, editing, payload);
     const existing = items.find((item) => item.id === payload.id) || editing;
     const isEditing = Boolean(existing);
 
@@ -405,9 +409,7 @@ export default function CooldownApp() {
     const host = hostnameFromUrl(activeTab.url);
     setNow(stamp);
     setItems((currentItems) => {
-      const existing =
-        currentItems.find((item) => item.url === activeTab.url) ||
-        currentItems.find((item) => item.scope === "domain" && hostnameFromUrl(item.url) === host);
+      const existing = findMatchingRule(currentItems, activeTab.url, { activeOnly: true }) ?? findMatchingRule(currentItems, activeTab.url);
 
       return upsertSite(
         currentItems,
@@ -470,7 +472,12 @@ export default function CooldownApp() {
         : settingsRef.current,
     };
     try {
-      if (!await saveStoredState(state)) throw new Error("storageSaveError");
+      const imported = await importStoredState(state, pendingImport);
+      if (!imported) throw new Error("storageSaveError");
+      if (typeof imported === "object") {
+        state.items = imported.items;
+        state.settings = imported.settings;
+      }
       savedStateRef.current = JSON.stringify(state);
       lastQueuedStateRef.current = state;
       setItems(state.items);
@@ -497,6 +504,13 @@ export default function CooldownApp() {
     try {
       const state = { items: itemsRef.current, settings: settingsRef.current };
       if (!await saveStoredState(state)) throw new Error("storageSaveError");
+      if (extensionMode) {
+        const stored = await loadStoredState();
+        state.items = stored.items;
+        state.settings = stored.settings;
+        setItems(state.items);
+        setSettings(state.settings);
+      }
       savedStateRef.current = JSON.stringify(state);
       lastQueuedStateRef.current = state;
       setWriteError(null);
@@ -513,10 +527,16 @@ export default function CooldownApp() {
       {storageStatus === "loading" ? <p role="status" className="p-4 text-sm">{t("storageLoading")}</p> : null}
       {storageError || writeError ? (
         <section role="alert" className="border-b border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
-          <p>{t(storageError ? "storageRecovery" : "storageSaveError")}</p>
+          <p>{t(storageError ? "storageRecovery" : ["duplicateSite", "staleSite"].includes(writeError?.message) ? writeError.message : "storageSaveError")}</p>
           <div className="mt-3 flex flex-wrap gap-3">
             <button className="rounded-lg border px-3 py-2" onClick={handleRetryStorage}>{t("retry")}</button>
             <button className="rounded-lg border px-3 py-2" onClick={handleExport}>{t("exportScreen")}</button>
+            {writeError ? <button className="rounded-lg border px-3 py-2" onClick={() => {
+              discardPendingRecovery();
+              setWriteError(null);
+              setStorageStatus("loading");
+              setLoadAttempt(attempt => attempt + 1);
+            }}>{t("reloadSaved")}</button> : null}
             {(storageError?.backup || writeError?.backup) ? (
               <button className="rounded-lg border px-3 py-2" onClick={() => downloadJsonFile("cooldown-recovery.json", storageError?.backup || writeError.backup)}>{t("exportOriginal")}</button>
             ) : null}
@@ -545,7 +565,7 @@ export default function CooldownApp() {
                   onClick={() => setShowSettings(true)}
                   className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950"
                   title={t("settings")}
-                  aria-label={t("openSettings")}
+                  aria-label={t("openSettings")} ref={settingsTriggerRef}
                 >
                   <SettingsIcon />
                 </button>
@@ -604,7 +624,7 @@ export default function CooldownApp() {
                 onClick={() => setShowSettings(true)}
                 className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950"
                 title={t("settings")}
-                aria-label={t("openSettings")}
+                aria-label={t("openSettings")} ref={settingsTriggerRef}
               >
                 <SettingsIcon />
               </button>
@@ -733,6 +753,7 @@ export default function CooldownApp() {
           onToggleNotifications={toggleNotifications}
           notifSupported={supported}
           permission={permission}
+          returnFocusRef={settingsTriggerRef}
         />
       ) : null}
 

@@ -67,7 +67,7 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
         createdAt: initial?.createdAt ?? now,
       });
     } catch (error) {
-      setFormError(error.message || t("saveError"));
+      setFormError(["duplicateSite", "staleSite"].includes(error.message) ? t(error.message) : error.message || t("saveError"));
       setIsSubmitting(false);
       return;
     }
@@ -228,7 +228,7 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
           </div>
         </div>
 
-        {formError ? <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{formError}</p> : null}
+        {formError ? <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{formError}</p> : null}
       </div>
 
       <div className="flex flex-wrap justify-end gap-3 border-t border-slate-100 px-6 py-4">
