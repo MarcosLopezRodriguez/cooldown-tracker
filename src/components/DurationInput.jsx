@@ -1,15 +1,15 @@
-import React, { useEffect, useState } from "react";
+import { useState } from "react";
 import { DURATION_PRESETS } from "../lib/constants.js";
 import { clampMinutes } from "../lib/utils.js";
-import { useI18n } from "../i18n/I18nContext.jsx";
+import { useI18n } from "../i18n/context.js";
 
-export default function DurationInput({ minutes, onChangeMinutes, inputId = "duration" }) {
+export default function DurationInput(props) {
+  return <DurationField key={props.minutes} {...props} />;
+}
+
+function DurationField({ minutes, onChangeMinutes, inputId = "duration" }) {
   const { t } = useI18n();
   const [value, setValue] = useState(String(minutes || 15));
-
-  useEffect(() => {
-    setValue(String(minutes || 15));
-  }, [minutes]);
 
   return (
     <div className="space-y-3">
@@ -18,7 +18,7 @@ export default function DurationInput({ minutes, onChangeMinutes, inputId = "dur
           id={inputId}
           type="number"
           min={1}
-          className="w-28 rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+          className="w-28 rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-xs transition focus:border-slate-400 focus:outline-hidden focus:ring-2 focus:ring-slate-200"
           value={value}
           onChange={(event) => setValue(event.target.value)}
           onBlur={() => {

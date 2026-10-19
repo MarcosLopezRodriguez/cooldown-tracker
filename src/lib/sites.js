@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, EXPORT_SCHEMA_VERSION, SITE_MODES } from "./constants.js";
+import { DEFAULT_SETTINGS, EXPORT_SCHEMA_VERSION, MAX_IMPORT_BYTES, SITE_MODES } from "./constants.js";
 import { asTimestamp, buildFaviconUrl, hostnameFromUrl, isExtensionContext, normalizeUrl, uid } from "./utils.js";
 
 function normalizeDurationMs(value, fallback = DEFAULT_SETTINGS.defaultDurationMs) {
@@ -110,14 +110,45 @@ export function normalizeSites(items, options = {}) {
   return items.map((item) => normalizeSite(item, options)).filter(Boolean);
 }
 
+export function validateSiteRecords(items) {
+  if (!Array.isArray(items)) return { key: "invalidImportFormat" };
+  const ids = new Set();
+  for (const [index, item] of items.entries()) {
+    const invalid = { key: "invalidImportItem", row: index + 1 };
+    if (!item || typeof item !== "object" || Array.isArray(item) || typeof item.url !== "string" || !normalizeUrl(item.url)) return invalid;
+    if (item.id !== undefined && (typeof item.id !== "string" || !item.id.trim())) return invalid;
+    if (item.id && ids.has(item.id)) return { key: "duplicateImportId", row: index + 1 };
+    if (item.id) ids.add(item.id);
+    if (item.durationMs !== undefined && (!Number.isSafeInteger(item.durationMs) || item.durationMs <= 0 || item.durationMs > 8_640_000_000_000_000 - Date.now())) return invalid;
+    if (item.mode !== undefined && !["always", "permanent", "cooldown"].includes(item.mode)) return invalid;
+    if (item.scope !== undefined && !["domain", "exact", "url"].includes(item.scope)) return invalid;
+    for (const key of ["createdAt", "updatedAt", "endAt", "lastVisitedAt"]) {
+      if (item[key] !== undefined && item[key] !== null && (!Number.isSafeInteger(item[key]) || item[key] < 0 || item[key] > 8_640_000_000_000_000)) return invalid;
+    }
+  }
+  return null;
+}
+
+export function validSettingsRecord(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return false;
+  for (const key of ["notificationsOn", "notifications", "soundOn", "sound", "privacyAccepted"]) {
+    if (input[key] !== undefined && typeof input[key] !== "boolean") return false;
+  }
+  if (input.defaultDurationMs !== undefined && (!Number.isSafeInteger(input.defaultDurationMs) || input.defaultDurationMs <= 0 || input.defaultDurationMs > 8_640_000_000_000_000 - Date.now())) return false;
+  return input.language === undefined || ["auto", "es", "en", "fr", "de", "it", "pl", "zh", "ru"].includes(input.language);
+}
+
 export function buildExportPayload(items, settings, exportedAt = new Date().toISOString()) {
   const normalizedSettings = normalizeSettings(settings);
+  // Consent belongs to this installation, never to a transferable backup.
+  const portableSettings = { ...normalizedSettings };
+  delete portableSettings.privacyAccepted;
   return {
     version: EXPORT_SCHEMA_VERSION,
     items: normalizeSites(items, {
       defaultDurationMs: normalizedSettings.defaultDurationMs,
     }),
-    settings: normalizedSettings,
+    settings: portableSettings,
     exportedAt,
   };
 }
@@ -126,6 +157,7 @@ export function parseImportPayload(text, options = {}) {
   const now = options.now ?? Date.now();
   const fallbackSettings = normalizeSettings(options.fallbackSettings);
   const translate = options.translate || ((key) => key);
+  if (new TextEncoder().encode(text).byteLength > MAX_IMPORT_BYTES) throw new Error(translate("fileTooLarge"));
   let rawPayload;
 
   try {
@@ -139,25 +171,49 @@ export function parseImportPayload(text, options = {}) {
     throw new Error(translate("invalidImportFormat"));
   }
 
-  const version = Number(payload.version) || 1;
+  const version = Object.hasOwn(payload, "version") ? payload.version : 1;
+  if (!Number.isInteger(version) || version < 1) throw new Error(translate("invalidImportFormat"));
   if (version > EXPORT_SCHEMA_VERSION) {
     throw new Error(translate("newerImportVersion"));
   }
 
-  const settings = payload.settings ? normalizeSettings(payload.settings) : null;
+  const hasItems = Object.hasOwn(payload, "items");
+  if (hasItems) {
+    const invalid = validateSiteRecords(payload.items);
+    if (invalid) throw new Error(translate(invalid.key, { row: invalid.row }));
+  }
+  if (payload.settings !== undefined && !validSettingsRecord(payload.settings)) throw new Error(translate("invalidImportSettings"));
+  const importedSettings = payload.settings;
+  const settings = importedSettings ? normalizeSettings({
+    ...fallbackSettings,
+    ...importedSettings,
+    notificationsOn: importedSettings.notificationsOn ?? importedSettings.notifications ?? fallbackSettings.notificationsOn,
+    soundOn: importedSettings.soundOn ?? importedSettings.sound ?? fallbackSettings.soundOn,
+    privacyAccepted: fallbackSettings.privacyAccepted,
+  }) : null;
   const effectiveSettings = settings ?? fallbackSettings;
-  const items = normalizeSites(payload.items, {
+  const usedIds = new Set((payload.items ?? []).map(item => item.id).filter(Boolean));
+  const preparedItems = payload.items?.map(item => {
+    if (item.id) return item;
+    const base = uid();
+    let id = base;
+    let suffix = 1;
+    while (usedIds.has(id)) id = `${base}-${suffix++}`;
+    usedIds.add(id);
+    return { ...item, id };
+  });
+  const items = normalizeSites(preparedItems, {
     now,
     defaultDurationMs: effectiveSettings.defaultDurationMs,
   });
 
-  if (!items.length && !settings) {
+  if (!hasItems && (!importedSettings || !Object.keys(importedSettings).some(key => ["language", "soundOn", "sound", "notificationsOn", "notifications", "defaultDurationMs"].includes(key)))) {
     throw new Error(translate("noImportData"));
   }
 
   return {
     version,
-    hasItems: Array.isArray(payload.items),
+    hasItems,
     items,
     settings,
   };

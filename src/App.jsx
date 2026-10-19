@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ActionDialog from "./components/ActionDialog.jsx";
 import AddEditModal from "./components/AddEditModal.jsx";
 import EmptyState from "./components/EmptyState.jsx";
@@ -6,7 +6,8 @@ import SettingsPanel from "./components/SettingsPanel.jsx";
 import SiteCard from "./components/SiteCard.jsx";
 import ToastViewport from "./components/ToastViewport.jsx";
 import PrivacyNotice from "./components/PrivacyNotice.jsx";
-import { FILTER_OPTIONS, SITE_MODES } from "./lib/constants.js";
+import ImportPreview from "./components/ImportPreview.jsx";
+import { DEFAULT_SETTINGS, FILTER_OPTIONS, MAX_IMPORT_BYTES, SITE_MODES } from "./lib/constants.js";
 import {
   buildExportPayload,
   clearCooldown,
@@ -20,11 +21,8 @@ import {
   upsertSite,
 } from "./lib/sites.js";
 import {
-  loadExtensionState,
-  loadStoredItems,
-  loadStoredSettings,
-  saveStoredItems,
-  saveStoredSettings,
+  loadStoredState,
+  saveStoredState,
   subscribeToExtensionState,
   usesExtensionStorage,
 } from "./lib/storage.js";
@@ -32,24 +30,33 @@ import { downloadJsonFile, formatClock, hostnameFromUrl, isExtensionContext, nor
 import { useNotificationCenter } from "./hooks/useNotificationCenter.js";
 import { useToasts } from "./hooks/useToasts.js";
 import { createTranslator, resolveLocale } from "../extension/i18n.js";
-import { I18nProvider, useI18n } from "./i18n/I18nContext.jsx";
+import { I18nProvider } from "./i18n/I18nContext.jsx";
+import { useI18n } from "./i18n/context.js";
 
 export default function CooldownApp() {
-  const initialNowRef = useRef(Date.now());
-  const initialNow = initialNowRef.current;
+  const [initialNow] = useState(() => Date.now());
   const extensionMode = isExtensionContext();
   const [now, setNow] = useState(initialNow);
-  const [items, setItems] = useState(() => loadStoredItems(initialNow));
-  const [settings, setSettings] = useState(() => loadStoredSettings());
+  const [items, setItems] = useState([]);
+  const [settings, setSettings] = useState(() => ({ ...DEFAULT_SETTINGS }));
   const locale = useMemo(() => resolveLocale(settings.language), [settings.language]);
   const t = useMemo(() => createTranslator(locale), [locale]);
-  const [storageReady, setStorageReady] = useState(() => !usesExtensionStorage());
+  const [storageStatus, setStorageStatus] = useState("loading");
+  const storageReady = storageStatus === "ready";
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [storageError, setStorageError] = useState(null);
+  const [writeError, setWriteError] = useState(null);
+  const [pendingImport, setPendingImport] = useState(null);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importError, setImportError] = useState("");
+  const [syncTick, setSyncTick] = useState(0);
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [activeTab, setActiveTab] = useState(null);
+  const [queriedTab, setActiveTab] = useState(null);
+  const activeTab = storageReady && extensionMode && settings.privacyAccepted ? queriedTab : null;
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [durationDecision, setDurationDecision] = useState(null);
   const { toasts, push } = useToasts();
@@ -64,6 +71,11 @@ export default function CooldownApp() {
   const settingsRef = useRef(settings);
   const tRef = useRef(t);
   const persistenceWarningShownRef = useRef(false);
+  const savedStateRef = useRef(null);
+  const lastQueuedStateRef = useRef(null);
+  const importBusyRef = useRef(false);
+  const stateVersionRef = useRef(0);
+  const pendingSavesRef = useRef(0);
 
   useEffect(() => {
     document.documentElement.lang = locale === "zh" ? "zh-CN" : locale;
@@ -82,48 +94,51 @@ export default function CooldownApp() {
   }, [t]);
 
   useEffect(() => {
-    if (!usesExtensionStorage()) {
-      return undefined;
-    }
-
     let cancelled = false;
-    loadExtensionState(initialNow)
+    loadStoredState()
       .then((state) => {
         if (cancelled || !state) {
           return;
         }
 
+        savedStateRef.current = JSON.stringify(state);
+        lastQueuedStateRef.current = state;
         setItems(state.items);
         setSettings(state.settings);
+        setStorageError(null);
+        setStorageStatus("ready");
       })
-      .catch(() => {
+      .catch((error) => {
         if (!cancelled) {
+          setStorageError(error);
+          setStorageStatus("error");
           push(tRef.current("storageLoadError"), "error");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setStorageReady(true);
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [initialNow, push]);
+  }, [loadAttempt, push]);
 
   useEffect(() => {
     if (!storageReady || !usesExtensionStorage()) {
       return undefined;
     }
 
-    return subscribeToExtensionState(() => {
-      loadExtensionState()
+    let cancelled = false;
+    let request = 0;
+    const refresh = () => {
+      const version = stateVersionRef.current;
+      if (importBusyRef.current || pendingSavesRef.current) return;
+      const currentRequest = ++request;
+      loadStoredState()
         .then((state) => {
-          if (!state) {
+          if (cancelled || currentRequest !== request || !state || importBusyRef.current || pendingSavesRef.current || version !== stateVersionRef.current) {
             return;
           }
-
+          savedStateRef.current = JSON.stringify(state);
+          lastQueuedStateRef.current = state;
           if (JSON.stringify(state.items) !== JSON.stringify(itemsRef.current)) {
             setItems(state.items);
           }
@@ -131,15 +146,19 @@ export default function CooldownApp() {
             setSettings(state.settings);
           }
         })
-        .catch(() => {
-          // The application keeps the currently displayed state if Chrome storage is temporarily unavailable.
+        .catch((error) => {
+          if (cancelled || currentRequest !== request || importBusyRef.current || version !== stateVersionRef.current) return;
+          setStorageError(error);
+          setStorageStatus("error");
         });
-    });
-  }, [storageReady]);
+    };
+    const unsubscribe = subscribeToExtensionState(refresh);
+    if (syncTick) refresh();
+    return () => { cancelled = true; unsubscribe(); };
+  }, [storageReady, syncTick]);
 
   useEffect(() => {
-    if (!extensionMode || !settings.privacyAccepted || !globalThis.chrome?.tabs?.query) {
-      setActiveTab(null);
+    if (!storageReady || !extensionMode || !settings.privacyAccepted || !globalThis.chrome?.tabs?.query) {
       return;
     }
 
@@ -163,71 +182,66 @@ export default function CooldownApp() {
   }, [extensionMode, settings.privacyAccepted, storageReady]);
 
   useEffect(() => {
+    if (!storageReady || pendingImport || (extensionMode && !settings.privacyAccepted)) return;
     const timerId = window.setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
-
-    return () => window.clearInterval(timerId);
-  }, []);
-
-  useEffect(() => {
-    if (!storageReady) {
-      return;
-    }
-
-    void saveStoredItems(items)
-      .then((saved) => {
-        if (!saved && !persistenceWarningShownRef.current) {
-          persistenceWarningShownRef.current = true;
-          push(t("storageSaveError"), "error");
-        }
-      })
-      .catch(() => {
-        if (!persistenceWarningShownRef.current) {
-          persistenceWarningShownRef.current = true;
-          push(t("storageSaveError"), "error");
-        }
-      });
-  }, [items, push, storageReady, t]);
-
-  useEffect(() => {
-    if (!storageReady) {
-      return;
-    }
-
-    void saveStoredSettings(settings)
-      .then((saved) => {
-        if (!saved && !persistenceWarningShownRef.current) {
-          persistenceWarningShownRef.current = true;
-          push(t("storageSaveError"), "error");
-        }
-      })
-      .catch(() => {
-        if (!persistenceWarningShownRef.current) {
-          persistenceWarningShownRef.current = true;
-          push(t("storageSaveError"), "error");
-        }
-      });
-  }, [push, settings, storageReady, t]);
-
-  useEffect(() => {
-    const { items: nextItems, completed } = resolveExpiredCooldowns(items, now);
-    if (!completed.length) {
-      return;
-    }
-
-    setItems(nextItems);
-    completed.forEach((item) => {
-      const key = `${item.id}:${item.endAt}`;
-      if (notifiedRef.current.has(key)) {
+      const stamp = Date.now();
+      setNow(stamp);
+      const { items: nextItems, completed } = resolveExpiredCooldowns(itemsRef.current, stamp);
+      if (!completed.length) {
         return;
       }
 
-      notifiedRef.current.add(key);
-      notifyReady(item);
-      push(t("readyToast", { name: item.label || hostnameFromUrl(item.url) }), "success");
-    });
-  }, [items, now, notifyReady, push, t]);
+      setItems(nextItems);
+      completed.forEach((item) => {
+        const key = `${item.id}:${item.endAt}`;
+        if (notifiedRef.current.has(key)) {
+          return;
+        }
+
+        notifiedRef.current.add(key);
+        if (!extensionMode || settingsRef.current.privacyAccepted) notifyReady(item);
+        push(t("readyToast", { name: item.label || hostnameFromUrl(item.url) }), "success");
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timerId);
+  }, [extensionMode, notifyReady, pendingImport, push, settings.privacyAccepted, storageReady, t]);
+
+  useEffect(() => {
+    const state = { items, settings };
+    const fingerprint = JSON.stringify(state);
+    if (!storageReady || importBusyRef.current || (!pendingSavesRef.current && savedStateRef.current === fingerprint)) {
+      return;
+    }
+
+    const previous = lastQueuedStateRef.current;
+    const changed = {
+      items: JSON.stringify(previous?.items) !== JSON.stringify(items),
+      settings: JSON.stringify(previous?.settings) !== JSON.stringify(settings),
+    };
+    if (!changed.items && !changed.settings) return;
+    lastQueuedStateRef.current = state;
+    pendingSavesRef.current += 1;
+    stateVersionRef.current += 1;
+    let succeeded = false;
+    void saveStoredState(state, changed)
+      .then((saved) => {
+        if (!saved) throw new Error("storageSaveError");
+        savedStateRef.current = fingerprint;
+        succeeded = true;
+        setWriteError(null);
+      })
+      .catch((error) => {
+        setWriteError(error);
+        if (!persistenceWarningShownRef.current) {
+          persistenceWarningShownRef.current = true;
+          push(t("storageSaveError"), "error");
+        }
+      }).finally(() => {
+        pendingSavesRef.current -= 1;
+        if (succeeded && !pendingSavesRef.current) setSyncTick(tick => tick + 1);
+      });
+  }, [items, push, settings, storageReady, t]);
 
   const visibleItems = useMemo(
     () =>
@@ -358,14 +372,14 @@ export default function CooldownApp() {
     setDurationDecision(null);
   };
 
-  const runCooldownAction = (action, id, message) => {
+  const handleCooldownAction = useCallback((action, id, message) => {
     const stamp = Date.now();
     setNow(stamp);
     setItems((currentItems) => action(currentItems, id, stamp));
     if (message) {
       push(message, "success");
     }
-  };
+  }, [push]);
 
   const handleOpenSite = (item, event) => {
     if (isExtensionContext()) {
@@ -378,7 +392,7 @@ export default function CooldownApp() {
       return;
     }
 
-    runCooldownAction(startCooldown, item.id);
+    handleCooldownAction(startCooldown, item.id);
   };
 
   const handleBlockActiveTab = () => {
@@ -425,22 +439,70 @@ export default function CooldownApp() {
       return;
     }
 
+    if (!storageReady) throw new Error(t("storageNotReady"));
+    if (file.size > MAX_IMPORT_BYTES) throw new Error(t("fileTooLarge"));
     const text = await file.text();
     const parsed = parseImportPayload(text, {
-      now,
+      now: Date.now(),
       fallbackSettings: settings,
       translate: t,
     });
 
-    if (parsed.hasItems) {
-      setItems(parsed.items);
-    }
+    setImportError("");
+    setPendingImport({ ...parsed, filename: file.name });
+    setShowSettings(false);
+  };
 
-    if (parsed.settings) {
-      setSettings(parsed.settings);
+  const handleConfirmImport = async () => {
+    if (!pendingImport || importBusyRef.current) return;
+    if (!storageReady) {
+      setImportError(t("storageNotReady"));
+      return;
     }
+    importBusyRef.current = true;
+    stateVersionRef.current += 1;
+    setImportBusy(true);
+    setImportError("");
+    const state = {
+      items: pendingImport.hasItems ? pendingImport.items : itemsRef.current,
+      settings: pendingImport.settings
+        ? { ...pendingImport.settings, privacyAccepted: settingsRef.current.privacyAccepted }
+        : settingsRef.current,
+    };
+    try {
+      if (!await saveStoredState(state)) throw new Error("storageSaveError");
+      savedStateRef.current = JSON.stringify(state);
+      lastQueuedStateRef.current = state;
+      setItems(state.items);
+      setSettings(state.settings);
+      setWriteError(null);
+      setPendingImport(null);
+      push(t("imported"), "success");
+    } catch (error) {
+      setWriteError(error);
+      setImportError(t("storageSaveError"));
+    } finally {
+      importBusyRef.current = false;
+      setImportBusy(false);
+    }
+  };
 
-    push(t("imported"), "success");
+  const handleRetryStorage = async () => {
+    if (!storageReady) {
+      stateVersionRef.current += 1;
+      setStorageStatus("loading");
+      setLoadAttempt(attempt => attempt + 1);
+      return;
+    }
+    try {
+      const state = { items: itemsRef.current, settings: settingsRef.current };
+      if (!await saveStoredState(state)) throw new Error("storageSaveError");
+      savedStateRef.current = JSON.stringify(state);
+      lastQueuedStateRef.current = state;
+      setWriteError(null);
+    } catch (error) {
+      setWriteError(error);
+    }
   };
 
   return (
@@ -448,14 +510,27 @@ export default function CooldownApp() {
       <div
         className={`cooldown-app min-h-screen bg-[#f4f7f6] text-slate-950 ${extensionMode ? "extension-shell" : ""}`}
       >
-      <header className="app-header sticky top-0 z-20 border-b border-slate-200/80 bg-white/95 backdrop-blur">
+      {storageStatus === "loading" ? <p role="status" className="p-4 text-sm">{t("storageLoading")}</p> : null}
+      {storageError || writeError ? (
+        <section role="alert" className="border-b border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+          <p>{t(storageError ? "storageRecovery" : "storageSaveError")}</p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <button className="rounded-lg border px-3 py-2" onClick={handleRetryStorage}>{t("retry")}</button>
+            <button className="rounded-lg border px-3 py-2" onClick={handleExport}>{t("exportScreen")}</button>
+            {(storageError?.backup || writeError?.backup) ? (
+              <button className="rounded-lg border px-3 py-2" onClick={() => downloadJsonFile("cooldown-recovery.json", storageError?.backup || writeError.backup)}>{t("exportOriginal")}</button>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+      <header inert={storageStatus === "loading"} className="app-header sticky top-0 z-20 border-b border-slate-200/80 bg-white/95 backdrop-blur">
         <div
           className={`mx-auto flex max-w-7xl flex-col gap-4 px-4 py-3 sm:px-6 ${
             extensionMode ? "" : "lg:flex-row lg:items-center lg:justify-between"
           }`}
         >
           <div className="flex items-center gap-3">
-            <div className="brand-mark flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg shadow-sm">
+            <div className="brand-mark flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg shadow-xs">
               <BrandMark />
             </div>
             <div className="min-w-0 flex-1">
@@ -498,7 +573,7 @@ export default function CooldownApp() {
               </div>
               <input
                 type="search"
-                className="block h-10 w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-10 pr-3 text-sm text-slate-700 transition focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
+                className="block h-10 w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-10 pr-3 text-sm text-slate-700 transition focus:border-slate-400 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-slate-200"
                 placeholder={t("searchSites")}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
@@ -514,7 +589,7 @@ export default function CooldownApp() {
                   aria-pressed={filter === option.value}
                   className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${
                     filter === option.value
-                      ? "bg-white text-slate-900 shadow-sm"
+                      ? "bg-white text-slate-900 shadow-xs"
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
@@ -549,7 +624,7 @@ export default function CooldownApp() {
         </div>
       </header>
 
-      <main className={`mx-auto max-w-7xl px-4 ${extensionMode ? "py-4" : "py-6 sm:px-6"}`}>
+      <main inert={storageStatus === "loading"} className={`mx-auto max-w-7xl px-4 ${extensionMode ? "py-4" : "py-6 sm:px-6"}`}>
         {extensionMode ? (
           <ActiveTabQuickBlock activeTab={activeTab} existingSite={activeTabSite} onBlock={handleBlockActiveTab} />
         ) : null}
@@ -561,7 +636,7 @@ export default function CooldownApp() {
             <SummaryTile label={t("savedSites")} value={summary.total} tone="slate" />
             <SummaryTile label={t("filterBlocked")} value={summary.active} tone="amber" />
             <SummaryTile label={t("available")} value={summary.ready} tone="emerald" />
-            <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-xs">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{t("nextAvailable")}</p>
               {summary.nextReady ? (
                 <>
@@ -597,21 +672,21 @@ export default function CooldownApp() {
                   extensionMode={extensionMode}
                   onOpen={(event) => handleOpenSite(item, event)}
                   onStart={() =>
-                    runCooldownAction(
+                    handleCooldownAction(
                       startCooldown,
                       item.id,
                       extensionMode ? t("blockActivated") : t("cooldownStarted"),
                     )
                   }
-                  onReset={() => runCooldownAction(resetCooldown, item.id, t("cooldownRestarted"))}
+                  onReset={() => handleCooldownAction(resetCooldown, item.id, t("cooldownRestarted"))}
                   onClear={() =>
-                    runCooldownAction(
+                    handleCooldownAction(
                       clearCooldown,
                       item.id,
                       item.mode === SITE_MODES.ALWAYS ? t("blockReleased") : t("cooldownReleased"),
                     )
                   }
-                  onMakePermanent={() => runCooldownAction(setPermanentBlock, item.id, t("permanentActivated"))}
+                  onMakePermanent={() => handleCooldownAction(setPermanentBlock, item.id, t("permanentActivated"))}
                   onEdit={() => {
                     setEditing(item);
                     setShowForm(true);
@@ -627,8 +702,8 @@ export default function CooldownApp() {
       <footer className={`px-4 text-center text-xs text-slate-500 sm:px-6 ${extensionMode ? "pb-5" : "pb-10"}`}>
         {extensionMode ? (
           <span className="inline-flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.12)]" />
-            {t("protectionActive")}
+            <span className={`h-2 w-2 rounded-full ${storageReady && settings.privacyAccepted ? "bg-emerald-500" : "bg-slate-400"}`} />
+            {t(!storageReady ? "protectionUnknown" : settings.privacyAccepted ? "protectionActive" : "protectionPaused")}
           </span>
         ) : (
           t("webPushNote")
@@ -658,6 +733,22 @@ export default function CooldownApp() {
           onToggleNotifications={toggleNotifications}
           notifSupported={supported}
           permission={permission}
+        />
+      ) : null}
+
+      {pendingImport ? (
+        <ImportPreview
+          preview={pendingImport}
+          currentCount={items.length}
+          busy={importBusy}
+          error={importError}
+          onExport={handleExport}
+          onConfirm={handleConfirmImport}
+          onCancel={() => {
+            if (importBusyRef.current) return;
+            setPendingImport(null);
+            setShowSettings(true);
+          }}
         />
       ) : null}
 
@@ -725,7 +816,7 @@ function ActiveTabQuickBlock({ activeTab, existingSite, onBlock }) {
   const alreadyPermanent = existingSite?.mode === SITE_MODES.ALWAYS;
 
   return (
-    <section className="active-tab-panel mb-3 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+    <section className="active-tab-panel mb-3 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xs">
       <div className="flex items-center gap-3 p-3.5">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
           <GlobeIcon />
@@ -747,7 +838,7 @@ function ActiveTabQuickBlock({ activeTab, existingSite, onBlock }) {
           className={`inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition ${
             !activeTab?.url || alreadyPermanent
               ? "cursor-not-allowed bg-slate-100 text-slate-400"
-              : "bg-[#e65054] text-white shadow-sm hover:bg-[#d94146]"
+              : "bg-[#e65054] text-white shadow-xs hover:bg-[#d94146]"
           }`}
         >
           <ShieldIcon />
@@ -761,7 +852,7 @@ function ActiveTabQuickBlock({ activeTab, existingSite, onBlock }) {
 function ExtensionSummary({ summary }) {
   const { t } = useI18n();
   return (
-    <section className="mb-3 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+    <section className="mb-3 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xs">
       <div className="grid grid-cols-3 divide-x divide-slate-100">
         <CompactMetric label={t("savedSites")} value={summary.total} />
         <CompactMetric label={t("filterBlocked")} value={summary.active} tone="rose" />
@@ -805,7 +896,7 @@ function SummaryTile({ label, value, tone }) {
         : "bg-slate-100 text-slate-700 ring-slate-200";
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-xs">
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
         <span className={`h-2.5 w-2.5 rounded-full ring-4 ${toneClassName}`} />
@@ -830,10 +921,17 @@ function ShieldIcon() {
 function BrandMark() {
   return (
     <svg className="h-full w-full" viewBox="0 0 40 40" fill="none" aria-hidden="true">
-      <rect x="5" y="5" width="30" height="30" rx="8.125" fill="#111827" />
-      <path d="M12.27 14.14C10 19.38 11.02 25.47 15.16 28.91C19.06 32.11 24.77 32.03 28.59 28.83C31.02 26.8 32.34 23.98 32.34 21.02" stroke="#F8FAFC" strokeWidth="2.97" strokeLinecap="round" />
-      <path d="M17.5 14.69V21.72M22.97 14.69V21.72" stroke="#5EEAD4" strokeWidth="2.81" strokeLinecap="round" />
-      <circle cx="30.78" cy="16.02" r="2.89" fill="#F16468" />
+      <defs>
+        <linearGradient id="brand-tile" x1="5" y1="4" x2="35" y2="36" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#19233A" />
+          <stop offset="1" stopColor="#101827" />
+        </linearGradient>
+      </defs>
+      <rect x="5" y="5" width="30" height="30" rx="8.125" fill="url(#brand-tile)" />
+      <path d="M10.7813 10.1563H29.2188C29.2188 14.6875 25.8594 17.3438 21.7188 20C25.8594 22.6563 29.2188 25.3125 29.2188 29.8438H10.7813C10.7813 25.3125 14.1406 22.6563 18.2813 20C14.1406 17.3438 10.7813 14.6875 10.7813 10.1563Z" stroke="#F8FAFC" strokeWidth="2.34375" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M13.0469 12.5H26.9531C26.25 15 23.4375 17.1094 20 19.375C16.5625 17.1094 13.75 15 13.0469 12.5Z" fill="#5EEAD4" />
+      <path d="M20 20.625C23.4375 22.8906 26.25 25 26.9531 27.5H13.0469C13.75 25 16.5625 22.8906 20 20.625Z" fill="#5EEAD4" />
+      <path d="M20 19.2188C19.4531 19.8438 19.5313 20.2344 20 20.625C20.4688 20.2344 20.5469 19.8438 20 19.2188Z" fill="#F16468" />
     </svg>
   );
 }

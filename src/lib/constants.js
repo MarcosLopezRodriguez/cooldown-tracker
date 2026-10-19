@@ -1,6 +1,7 @@
 export const LS_KEY = "cooldown_site_timers_v1";
 export const LS_SETTINGS_KEY = "cooldown_settings_v1";
 export const EXPORT_SCHEMA_VERSION = 3;
+export const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
 
 export const SITE_MODES = Object.freeze({
   COOLDOWN: "cooldown",

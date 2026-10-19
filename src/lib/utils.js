@@ -13,8 +13,15 @@ export function normalizeUrl(input) {
       return null;
     }
 
-    const withProtocol = /^(https?:)?\/\//i.test(tentative) ? tentative : `https://${tentative}`;
-    return new URL(withProtocol).toString();
+    const withProtocol = tentative.startsWith("//")
+      ? `https:${tentative}`
+      : /^[a-z][a-z\d+.-]*:/i.test(tentative) && !/^[^/:]+:\d+(?:\/|$)/.test(tentative)
+        ? tentative
+        : `https://${tentative}`;
+    const url = new URL(withProtocol);
+    return ["http:", "https:"].includes(url.protocol) && url.hostname && !url.username && !url.password
+      ? url.toString()
+      : null;
   } catch {
     return null;
   }

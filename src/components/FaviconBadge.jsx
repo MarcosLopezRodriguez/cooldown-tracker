@@ -1,7 +1,11 @@
-import React, { useEffect, useState } from "react";
-import { useI18n } from "../i18n/I18nContext.jsx";
+import { useState } from "react";
+import { useI18n } from "../i18n/context.js";
 
-export default function FaviconBadge({
+export default function FaviconBadge(props) {
+  return <FaviconImage key={props.src || ""} {...props} />;
+}
+
+function FaviconImage({
   src,
   label,
   sizeClassName = "h-12 w-12",
@@ -10,10 +14,6 @@ export default function FaviconBadge({
 }) {
   const { t } = useI18n();
   const [showFallback, setShowFallback] = useState(!src);
-
-  useEffect(() => {
-    setShowFallback(!src);
-  }, [src]);
 
   return (
     <div

@@ -1,11 +1,10 @@
-import React from "react";
-import { useI18n } from "../i18n/I18nContext.jsx";
+import { useI18n } from "../i18n/context.js";
 
 export default function EmptyState({ onAdd, extensionMode = false }) {
   const { t } = useI18n();
   return (
     <div
-      className={`rounded-lg border border-dashed border-slate-300 bg-white px-6 text-center shadow-sm ${
+      className={`rounded-lg border border-dashed border-slate-300 bg-white px-6 text-center shadow-xs ${
         extensionMode ? "mt-3 py-8" : "mt-12 py-14"
       }`}
     >

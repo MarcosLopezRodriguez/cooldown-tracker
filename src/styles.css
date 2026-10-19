@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss" source(none);
+@source "../index.html";
+@source "./**/*.{js,jsx}";
 
 @layer base {
   :root {
@@ -36,6 +36,11 @@
   select,
   textarea {
     font: inherit;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
   }
 
   :where(button, a, input, select, textarea):focus-visible {

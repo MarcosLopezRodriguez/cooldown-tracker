@@ -1,8 +1,7 @@
-import React from "react";
 import FaviconBadge from "./FaviconBadge.jsx";
 import { formatClock } from "../lib/utils.js";
 import { getSiteView } from "../lib/sites.js";
-import { useI18n } from "../i18n/I18nContext.jsx";
+import { useI18n } from "../i18n/context.js";
 
 export default function SiteCard({
   item,
@@ -28,7 +27,7 @@ export default function SiteCard({
 
   return (
     <article
-      className={`site-card group relative overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition hover:border-slate-300 hover:shadow-md ${
+      className={`site-card group relative overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xs transition hover:border-slate-300 hover:shadow-md ${
         extensionMode ? "extension-site-card" : "hover:-translate-y-0.5"
       }`}
     >

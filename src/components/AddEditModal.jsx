@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import DialogShell from "./DialogShell.jsx";
 import DurationInput from "./DurationInput.jsx";
 import FaviconBadge from "./FaviconBadge.jsx";
 import { SITE_MODES } from "../lib/constants.js";
 import { buildFaviconUrl, clampMinutes, hostnameFromUrl, isExtensionContext, normalizeUrl } from "../lib/utils.js";
-import { useI18n } from "../i18n/I18nContext.jsx";
+import { useI18n } from "../i18n/context.js";
 
 export default function AddEditModal({ initial, defaultDurationMs, onClose, onSave }) {
   const { t } = useI18n();
@@ -12,7 +12,7 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
   const closeButtonRef = useRef(null);
   const extensionMode = isExtensionContext();
   const [url, setUrl] = useState(initial?.url || "");
-  const [label, setLabel] = useState(initial?.label || "");
+  const [customLabel, setLabel] = useState(initial?.label || "");
   const [isCustomLabel, setIsCustomLabel] = useState(() => {
     if (!initial?.label || !initial?.url) {
       return false;
@@ -30,18 +30,9 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
 
   const normalizedUrl = useMemo(() => normalizeUrl(url), [url]);
   const host = normalizedUrl ? hostnameFromUrl(normalizedUrl) : "";
+  const label = isCustomLabel ? customLabel : host;
   const favicon = normalizedUrl ? buildFaviconUrl(normalizedUrl) : null;
   const isValid = Boolean(normalizedUrl) && (mode === SITE_MODES.ALWAYS || minutes > 0);
-
-  useEffect(() => {
-    if (!host) {
-      return;
-    }
-
-    if (!isCustomLabel) {
-      setLabel(host);
-    }
-  }, [host, isCustomLabel]);
 
   const save = async () => {
     if (isSubmitting) {
@@ -124,7 +115,7 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
               imageClassName="h-8 w-8"
             />
             {normalizedUrl ? (
-              <div className="absolute -bottom-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-emerald-500 text-white shadow-sm">
+              <div className="absolute -bottom-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-emerald-500 text-white shadow-xs">
                 <CheckIcon />
               </div>
             ) : null}
@@ -149,7 +140,7 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
                 setUrl(event.target.value);
                 setFormError("");
               }}
-              className="block w-full rounded-lg border border-slate-300 py-2.5 pl-10 pr-3 text-sm shadow-sm transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+              className="block w-full rounded-lg border border-slate-300 py-2.5 pl-10 pr-3 text-sm shadow-xs transition focus:border-slate-400 focus:outline-hidden focus:ring-2 focus:ring-slate-200"
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   save();
@@ -173,7 +164,7 @@ export default function AddEditModal({ initial, defaultDurationMs, onClose, onSa
               setLabel(event.target.value);
               setIsCustomLabel(Boolean(event.target.value.trim()) && event.target.value.trim() !== host);
             }}
-            className="block w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-sm transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+            className="block w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm shadow-xs transition focus:border-slate-400 focus:outline-hidden focus:ring-2 focus:ring-slate-200"
             onKeyDown={(event) => {
               if (event.key === "Enter") {
                 save();

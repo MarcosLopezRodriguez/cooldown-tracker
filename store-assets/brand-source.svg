@@ -1,22 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
   <title>Cooldown Tracker</title>
-  <desc>Temporizador en pausa con indicador de estado.</desc>
+  <desc>Un reloj de arena que representa una pausa de duración limitada.</desc>
+  <defs>
+    <linearGradient id="tile" x1="64" y1="48" x2="448" y2="464" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#19233A"/>
+      <stop offset="1" stop-color="#101827"/>
+    </linearGradient>
+  </defs>
 
-  <!-- El área visible mide 384 × 384 y deja el margen de 16 px recomendado
-       por Chrome Web Store cuando se exporta a 128 × 128. -->
-  <rect x="64" y="64" width="384" height="384" rx="104" fill="#111827"/>
+  <!-- The mark occupies the padded 96x96 px artwork area at 128x128 export. -->
+  <rect x="64" y="64" width="384" height="384" rx="104" fill="url(#tile)"/>
 
-  <!-- El arco abierto comunica espera sin parecer un botón de encendido. -->
-  <path
-    d="M157 181C128 248 141 326 194 370C244 411 317 410 366 369C397 343 414 307 414 269"
-    stroke="#F8FAFC"
-    stroke-width="38"
-    stroke-linecap="round"
-  />
+  <!-- A new hourglass silhouette replaces the former paused timer. -->
+  <path d="M138 130H374C374 188 331 222 278 256C331 290 374 324 374 382H138C138 324 181 290 234 256C181 222 138 188 138 130Z"
+        stroke="#F8FAFC" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
 
-  <!-- Pausa: formas anchas y separadas para conservarse a 16 px. -->
-  <path d="M224 188V278M294 188V278" stroke="#5EEAD4" stroke-width="36" stroke-linecap="round"/>
-
-  <!-- El punto completa visualmente el temporizador y aporta el estado activo. -->
-  <circle cx="394" cy="205" r="37" fill="#F16468"/>
+  <!-- Sand in the upper and lower chambers, with one coral grain in flight. -->
+  <path d="M167 160H345C336 192 300 219 256 248C212 219 176 192 167 160Z" fill="#5EEAD4"/>
+  <path d="M256 264C300 293 336 320 345 352H167C176 320 212 293 256 264Z" fill="#5EEAD4"/>
+  <path d="M256 246C249 254 250 259 256 264C262 259 263 254 256 246Z" fill="#F16468"/>
 </svg>

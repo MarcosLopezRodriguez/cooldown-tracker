@@ -77,7 +77,18 @@ npm run build
 npm run build:extension
 npm run preview
 npm run lint
+npm test
+npm run check:extension
 ```
+
+`npm test` ejecuta las regresiones de reglas, temporizadores, importación/exportación e idiomas.
+Después de `npm run build:extension`, `npm run check:extension` comprueba el manifiesto, las entradas empaquetadas, los iconos y los ocho catálogos de Chrome.
+
+El proyecto usa React 19, Vite 8 y Tailwind CSS 4 mediante `@tailwindcss/vite`; no requiere Autoprefixer ni configuración PostCSS adicional. ESLint 10 reconoce JSX de forma nativa. Las versiones directas están fijadas y `package-lock.json` permite reinstalar con `npm ci`.
+
+La instalación de esta actualización usó una excepción puntual a la espera de siete días de npm para `react`, `react-dom` y `eslint`, después de comprobar sus publicaciones oficiales. La política de espera global no se ha desactivado.
+
+Tras cambios de dependencias, ejecuta análisis, pruebas y ambas compilaciones. Comprueba además en Chrome instalado el bloqueo por dominio y URL exacta, la apertura puntual, las alarmas con la interfaz cerrada y la restauración de una copia. El informe de la actualización está en [docs/DEPENDENCY_UPGRADE_2026-10-18.md](docs/DEPENDENCY_UPGRADE_2026-10-18.md).
 
 ## Estructura
 

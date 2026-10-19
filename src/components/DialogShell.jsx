@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 const FOCUSABLE_SELECTOR = [
   "a[href]",
@@ -33,8 +33,8 @@ export default function DialogShell({
   const onCloseRef = useRef(onClose);
   const overlayClassName = useMemo(() => {
     return variant === "side"
-      ? "fixed inset-0 z-40 flex justify-end bg-slate-950/40 p-0 backdrop-blur-sm"
-      : "fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm";
+      ? "fixed inset-0 z-40 flex justify-end bg-slate-950/40 p-0 backdrop-blur-xs"
+      : "fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-xs";
   }, [variant]);
 
   useEffect(() => {

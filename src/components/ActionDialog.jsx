@@ -1,6 +1,5 @@
-import React from "react";
 import DialogShell from "./DialogShell.jsx";
-import { useI18n } from "../i18n/I18nContext.jsx";
+import { useI18n } from "../i18n/context.js";
 
 function toneClassName(tone) {
   switch (tone) {

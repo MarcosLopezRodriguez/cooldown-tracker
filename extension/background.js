@@ -36,14 +36,24 @@ function matchesScope(item, targetUrl) {
 
 async function readState() {
   const values = await chrome.storage.local.get([ITEMS_KEY, SETTINGS_KEY]);
+  if ((values[ITEMS_KEY] !== undefined && !Array.isArray(values[ITEMS_KEY])) ||
+      (values[SETTINGS_KEY] !== undefined && (!values[SETTINGS_KEY] || typeof values[SETTINGS_KEY] !== "object" || Array.isArray(values[SETTINGS_KEY])))) {
+    throw new Error("Invalid stored data");
+  }
   return {
     items: Array.isArray(values[ITEMS_KEY]) ? values[ITEMS_KEY] : [],
     settings: values[SETTINGS_KEY] && typeof values[SETTINGS_KEY] === "object" ? values[SETTINGS_KEY] : {},
   };
 }
 
-async function syncCooldownAlarms(items) {
-  const activeItems = items.filter((item) => isTimedCooldown(item));
+async function readActiveState() {
+  const state = await readState();
+  return state.settings.privacyAccepted === true ? state : null;
+}
+
+async function syncCooldownAlarms() {
+  const state = await readActiveState();
+  const activeItems = state ? state.items.filter((item) => isTimedCooldown(item)) : [];
   const activeAlarmNames = new Set(activeItems.map(getAlarmName));
   const existingAlarms = await chrome.alarms.getAll();
 
@@ -53,21 +63,26 @@ async function syncCooldownAlarms(items) {
       .map((alarm) => chrome.alarms.clear(alarm.name)),
   );
 
-  activeItems.forEach((item) => {
-    chrome.alarms.create(getAlarmName(item), { when: item.endAt });
-  });
+  // Consent can change while an asynchronous Chrome call is pending.
+  const latest = await readActiveState();
+  if (!latest) {
+    allowedTabs.clear();
+    const alarms = await chrome.alarms.getAll();
+    await Promise.all(alarms.filter(alarm => alarm.name.startsWith(ALARM_PREFIX)).map(alarm => chrome.alarms.clear(alarm.name)));
+    return;
+  }
+  for (const item of latest.items.filter(item => isTimedCooldown(item))) {
+    await chrome.alarms.create(getAlarmName(item), { when: item.endAt });
+  }
 }
 
-async function syncStoredCooldownAlarms() {
-  const { items } = await readState();
-  await syncCooldownAlarms(items);
-}
-
-async function showReadyNotification(item, settings) {
-  if (!settings.notificationsOn) {
+async function showReadyNotification(item) {
+  const state = await readActiveState();
+  if (!state?.settings.notificationsOn) {
     return;
   }
 
+  const { settings } = state;
   const locale = resolveLocale(settings.language);
   const name = item.label || new URL(item.url).hostname;
   await chrome.notifications.create(`cooldown-ready:${item.id}:${Date.now()}`, {
@@ -94,6 +109,10 @@ function isAllowedNavigation(details, targetUrl) {
 }
 
 async function redirectBlockedTab(tabId, blockingItem, targetUrl) {
+  const latest = await readActiveState();
+  const currentItem = latest?.items.find(item => item.id === blockingItem.id && isActive(item) && matchesScope(item, targetUrl));
+  if (!currentItem) return;
+  blockingItem = currentItem;
   const params = new URLSearchParams({
     label: blockingItem.label || targetUrl.hostname,
     mode: blockingItem.mode === "always" ? "always" : "cooldown",
@@ -109,8 +128,10 @@ async function redirectBlockedTab(tabId, blockingItem, targetUrl) {
   });
 }
 
-async function enforceActiveCooldowns(items) {
-  const activeItems = items.filter((item) => isActive(item));
+async function enforceActiveCooldowns() {
+  const state = await readActiveState();
+  if (!state) return;
+  const activeItems = state.items.filter((item) => isActive(item));
   if (!activeItems.length) {
     return;
   }
@@ -170,7 +191,9 @@ async function openSiteFromApp(siteId) {
   );
 
   const targetUrl = new URL(site.url).href;
+  if (!await readActiveState()) throw new Error(translate(locale, "privacyRequired"));
   await chrome.storage.local.set({ [ITEMS_KEY]: nextItems });
+  if (!await readActiveState()) throw new Error(translate(locale, "privacyRequired"));
   const tab = await chrome.tabs.create({ url: "about:blank", active: true });
   if (typeof tab.id !== "number") {
     throw new Error(translate(locale, "tabCreateError"));
@@ -182,6 +205,7 @@ async function openSiteFromApp(siteId) {
   });
 
   try {
+    if (!await readActiveState()) throw new Error(translate(locale, "privacyRequired"));
     await chrome.tabs.update(tab.id, { url: targetUrl });
   } catch (error) {
     allowedTabs.delete(tab.id);
@@ -200,24 +224,23 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return true;
 });
 
-chrome.runtime.onInstalled.addListener(() => {
-  void syncStoredCooldownAlarms();
-});
+// Serialize reconciliation so revocation also removes alarms from an older run.
+let reconciliation = Promise.resolve();
+function reconcileProtection() {
+  reconciliation = reconciliation.catch(() => {}).then(async () => {
+    await syncCooldownAlarms();
+    await enforceActiveCooldowns();
+  }).catch(() => {
+    // A failed read must never enable blocking, create defaults or overwrite data.
+    allowedTabs.clear();
+  });
+  return reconciliation;
+}
 
-chrome.runtime.onStartup.addListener(() => {
-  void syncStoredCooldownAlarms();
-});
-
+chrome.runtime.onInstalled.addListener(reconcileProtection);
+chrome.runtime.onStartup.addListener(reconcileProtection);
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName === "local" && changes[ITEMS_KEY]) {
-    const items = Array.isArray(changes[ITEMS_KEY].newValue) ? changes[ITEMS_KEY].newValue : [];
-    void syncCooldownAlarms(items);
-    void enforceActiveCooldowns(items);
-  }
-
-  if (areaName === "local" && changes[SETTINGS_KEY]?.newValue?.privacyAccepted === true) {
-    void readState().then(({ items }) => enforceActiveCooldowns(items));
-  }
+  if (areaName === "local" && (changes[ITEMS_KEY] || changes[SETTINGS_KEY])) return reconcileProtection();
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
@@ -230,9 +253,11 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 
   void (async () => {
-    const { items, settings } = await readState();
+    const state = await readActiveState();
+    if (!state) return;
+    const { items } = state;
     const item = items.find((candidate) => getAlarmName(candidate) === alarm.name);
-    if (!item || item.mode === "always" || !Number.isFinite(item.endAt)) {
+    if (!item || item.mode === "always" || !Number.isFinite(item.endAt) || item.endAt > Date.now()) {
       return;
     }
 
@@ -243,9 +268,10 @@ chrome.alarms.onAlarm.addListener((alarm) => {
         : candidate,
     );
 
+    if (!await readActiveState()) return;
     await chrome.storage.local.set({ [ITEMS_KEY]: nextItems });
-    await showReadyNotification(item, settings);
-  })();
+    await showReadyNotification(item);
+  })().catch(() => {});
 });
 
 chrome.webNavigation.onBeforeNavigate.addListener((details) => {
@@ -254,10 +280,9 @@ chrome.webNavigation.onBeforeNavigate.addListener((details) => {
   }
 
   void (async () => {
-    const { items, settings } = await readState();
-    if (settings.privacyAccepted !== true) {
-      return;
-    }
+    const state = await readActiveState();
+    if (!state) return;
+    const { items } = state;
 
     let targetUrl;
     try {
@@ -280,5 +305,5 @@ chrome.webNavigation.onBeforeNavigate.addListener((details) => {
     }
 
     await redirectBlockedTab(details.tabId, blockingItem, targetUrl);
-  })();
+  })().catch(() => {});
 });

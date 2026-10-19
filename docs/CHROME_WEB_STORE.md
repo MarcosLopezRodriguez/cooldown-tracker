@@ -69,9 +69,10 @@ Es necesario para comparar dominios y URLs visitadas con la lista local de bloqu
 
 ## Recursos gráficos
 
-- Icono de tienda: `extension/icons/icon128.png`.
+- Icono de tienda: `extension/icons/icon128.png` (marca de 96×96 con 16 px de margen transparente); variantes para el navegador: `icon16.png`, `icon32.png` y `icon48.png`.
+- Fuente vectorial del icono: `store-assets/brand-source.svg`; el favicon y la marca de la interfaz usan el mismo símbolo y paleta.
+- Tile promocional obligatorio: `store-assets/small-promo-440x280.png`, sin texto para servir a todos los idiomas.
+- Marquee opcional: `store-assets/marquee-1400x560.png`, con fuente en `store-assets/marquee-source.svg`.
 - Capturas: entre 1 y 5 imágenes de `1280x800` o `640x400`.
-- Tile promocional pequeño: `440x280` en PNG o JPEG.
-- Imagen marquee opcional: `1400x560` en PNG o JPEG.
 
 Antes de publicar, aloja `PRIVACY.md` en una URL pública y estable.

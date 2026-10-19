@@ -1,6 +1,6 @@
-import React, { useRef } from "react";
+import { useRef } from "react";
 import DialogShell from "./DialogShell.jsx";
-import { useI18n } from "../i18n/I18nContext.jsx";
+import { useI18n } from "../i18n/context.js";
 
 export default function PrivacyNotice({ onAccept }) {
   const { t } = useI18n();

@@ -1,8 +1,8 @@
-import React, { useRef, useState } from "react";
+import { useRef, useState } from "react";
 import DialogShell from "./DialogShell.jsx";
 import DurationInput from "./DurationInput.jsx";
 import { LANGUAGE_OPTIONS } from "../../extension/i18n.js";
-import { useI18n } from "../i18n/I18nContext.jsx";
+import { useI18n } from "../i18n/context.js";
 
 export default function SettingsPanel({
   settings,
@@ -39,7 +39,7 @@ export default function SettingsPanel({
       await onImport(file);
       setImportMessage({
         tone: "success",
-        text: t("importSuccess"),
+        text: t("previewReady"),
       });
     } catch (error) {
       setImportMessage({
@@ -95,7 +95,7 @@ export default function SettingsPanel({
                   language: event.target.value,
                 }))
               }
-              className="block h-11 w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 pr-10 text-sm font-medium text-slate-800 shadow-sm transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+              className="block h-11 w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 pr-10 text-sm font-medium text-slate-800 shadow-xs transition focus:border-slate-400 focus:outline-hidden focus:ring-2 focus:ring-slate-200"
               aria-label={t("language")}
             >
               {LANGUAGE_OPTIONS.map((option) => (
@@ -228,7 +228,7 @@ function Toggle({ checked, disabled = false, onClick, srLabel }) {
     >
       <span className="sr-only">{srLabel}</span>
       <span
-        className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition ${
+        className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition ${
           checked ? "translate-x-5" : "translate-x-0"
         }`}
       />
