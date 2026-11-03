@@ -27,7 +27,7 @@ const baseUrl = `http://127.0.0.1:${server.address().port}`;
 const configFile = path.join(output, "config.json");
 await writeFile(configFile, JSON.stringify({ browser: {
   browserName: "chromium", launchOptions: { channel: "chromium", headless: true, args: [`--disable-extensions-except=${path.join(root, "dist")}`, `--load-extension=${path.join(root, "dist")}`, "--no-proxy-server", "--host-resolver-rules=MAP *.cooldown.test 127.0.0.1, MAP cooldown.test 127.0.0.1"] },
-  contextOptions: { viewport: { width: 420, height: 700 } },
+  contextOptions: { locale: "es-ES", viewport: { width: 420, height: 700 } },
 } }, null, 2));
 let sequence = 0;
 const results = [];
