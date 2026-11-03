@@ -12,7 +12,7 @@ El trabajador finaliza los temporizadores y emite las notificaciones de la exten
 
 ## Validación
 
-- `npm run check` comprueba Node/npm, lint, regresiones deterministas, compilación web (`dist-web`), compilación de extensión (`dist`) y recursos/versiones del paquete. Requiere Node 24.15+ dentro de 24 LTS y npm 12.
+- `npm run check` comprueba Node/npm, lint, regresiones deterministas, compilación web (`dist-web`), compilación de extensión (`dist`) y recursos/versiones del paquete. Requiere Node 24.22.1+ dentro de 24 LTS y npm 12.
 - `npx --no-install playwright install chromium` instala el navegador de las pruebas. En CI Linux se usa `--with-deps`.
 - `npm run test:browser` usa Playwright CLI, un servidor local y un perfil temporal aislado. Comprueba web y extensión real, teclado, varias interfaces, navegación interna, alarmas, parada del trabajador y reinicio de Chrome. No usa el perfil personal ni publica nada.
 - `artifacts/extension-1.0.0.json` identifica cada archivo del paquete y su huella conjunta SHA-256. Regenera el inventario con `npm run check:extension` tras cambiar el build.

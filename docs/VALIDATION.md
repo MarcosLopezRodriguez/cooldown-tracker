@@ -2,7 +2,7 @@
 
 ## Comprobaciones repetibles
 
-Usa Node 24.15 o superior dentro de la rama 24 LTS y npm 12. El entorno de la comprobación del 19 de octubre de 2026 es Node 24.19.0 y npm 12.2.0.
+Usa Node 24.22.1 o superior dentro de la rama 24 LTS y npm 12. Esta versión mínima incorpora los [parches de seguridad del 21 de octubre de 2026](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases). El entorno de la comprobación histórica del 19 de octubre de 2026 fue Node 24.19.0 y npm 12.2.0.
 
 ```sh
 npm ci
@@ -15,7 +15,19 @@ En Linux, la instalación del navegador para CI usa `npx --no-install playwright
 
 `npm run check` valida el entorno, ejecuta ESLint sin advertencias y las regresiones deterministas, genera la web en `dist-web` y la extensión en `dist`, y valida sus recursos. `npm run test:browser` ejecuta escenarios persistentes con Playwright CLI en un perfil temporal aislado y un servidor local de datos de prueba. Cierra el navegador y el servidor al terminar, también cuando hay un fallo. No utiliza el perfil personal.
 
-El workflow `.github/workflows/check.yml` ejecuta esos controles en push, pull request y ejecución manual. Sus acciones están fijadas a commits. Publica como artefactos de CI los directorios web, extensión e informes de validación. Su primera ejecución en GitHub requiere subir estos cambios; la validación local se documenta por separado.
+El workflow `.github/workflows/check.yml` ejecuta esos controles en push, pull request y ejecución manual. Sus acciones están fijadas a commits. Publica como artefactos de CI los directorios web, extensión e informes de validación. La validación local y el resultado de GitHub se comprueban por separado.
+
+### Entorno portátil en Windows
+
+Si la instalación global no cumple la versión requerida, se puede usar una copia portátil oficial. En este equipo está instalada en `%LOCALAPPDATA%\cooldown-runtime\node-v24.22.1-win-x64`, con npm 12.2.0. Actívala para la sesión de PowerShell antes de ejecutar los controles:
+
+```powershell
+$env:PATH = "$env:LOCALAPPDATA\cooldown-runtime\node-v24.22.1-win-x64;$env:PATH"
+node --version
+npm --version
+```
+
+La validación del 3 de noviembre de 2026 con ese entorno pasó lint, 51 pruebas, ambas compilaciones, el validador de paquete y 47 comprobaciones en Chrome real (15 web, 25 extensión, 4 reactivación del trabajador y 3 reinicio). `npm audit` notificó seis avisos moderados en dependencias de desarrollo de la cadena ESLint/minimatch, derivados de [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249), sin arreglo automático compatible. `npm audit --omit=dev` no notificó vulnerabilidades. No equivalen a seis vulnerabilidades independientes del producto; queda pendiente revisar la actualización compatible de esa cadena. No se aplicó `npm audit fix --force`.
 
 ## Evidencia que genera cada comprobación
 
