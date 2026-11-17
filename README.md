@@ -67,6 +67,10 @@ El icono de tienda está en `extension/icons/icon128.png`. Después de ejecutar 
 
 ## Datos y avisos
 
+Al editar un sitio con un contador activo, **Aplicar ahora** recalcula el vencimiento desde la última visita. Si la nueva duración ya ha transcurrido, el contador termina. **Próxima visita** mantiene el vencimiento actual y usa la nueva duración cuando vuelvas a iniciar el contador. Un contador que termina mientras decides no se reactiva al confirmar.
+
+La web recuerda los avisos ya emitidos por sitio y vencimiento. Este historial local no forma parte de las copias exportadas, para que restaurar una copia o recargar no repita el mismo aviso. Si bloqueas el almacenamiento, la protección solo dura mientras la página permanece abierta; borrar los datos del navegador también borra ese historial.
+
 Los datos exportados contienen `version`, `items`, `settings` y `exportedAt`. La importación admite archivos de hasta 2 MB y rechaza formatos creados por una versión más reciente de la aplicación.
 
 Exporta una copia antes de sustituir datos. La importación valida todo el archivo, rechaza filas y ámbitos duplicados y muestra una vista previa antes de confirmar. Puedes cancelar sin cambios. La aceptación de privacidad pertenece a cada instalación y no se transfiere en una copia. Ante un fallo de almacenamiento se puede exportar lo que aparece en pantalla y reintentar; una lectura fallida protege los originales.

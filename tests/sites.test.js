@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  buildExportPayload, clearCooldown, getSiteView, getVisibleSites, normalizeSettings,
+  applyDurationEdit, buildExportPayload, clearCooldown, getSiteView, getVisibleSites, normalizeSettings,
   normalizeSite, parseImportPayload, removeSite, resetCooldown, resolveExpiredCooldowns,
   setPermanentBlock, startCooldown, upsertSite,
 } from "../src/lib/sites.js";
@@ -9,6 +9,18 @@ import { formatClock, normalizeUrl } from "../src/lib/utils.js";
 import { createTranslator, resolveLocale } from "../extension/i18n.js";
 
 const now = 2_000_000;
+test("cambiar duración: ahora conserva el inicio y próxima visita conserva el vencimiento", () => {
+  const original = { id: "duration", mode: "cooldown", durationMs: 120000, lastVisitedAt: now, endAt: now + 120000 };
+  const draft = { ...original, durationMs: 60000 };
+  assert.equal(applyDurationEdit([original], original, draft, "now", now + 10000).endAt, now + 60000);
+  assert.equal(applyDurationEdit([original], original, draft, "next", now + 10000).endAt, original.endAt);
+  const extended = { ...draft, durationMs: 240000 };
+  assert.equal(applyDurationEdit([original], original, extended, "now", now + 10000).endAt, now + 240000);
+  const shortened = applyDurationEdit([original], original, draft, "now", now + 90000);
+  assert.equal(resolveExpiredCooldowns([shortened], now + 90000).completed.length, 1);
+  assert.equal(applyDurationEdit([{ ...original, endAt: null }], original, draft, "now", now + 150000).endAt, null);
+  assert.throws(() => applyDurationEdit([], original, draft, "now", now), /staleSite/);
+});
 const site = (overrides = {}) => normalizeSite({
   id: "example", url: "https://example.com/", durationMs: 60_000, createdAt: now, ...overrides,
 }, { now });

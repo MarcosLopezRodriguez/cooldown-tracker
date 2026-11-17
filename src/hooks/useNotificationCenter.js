@@ -33,7 +33,7 @@ function showBrowserNotification(item, t) {
   const notification = new Notification(t("notificationTitle", { name: item.label || hostnameFromUrl(item.url) }), {
     body: t("notificationBody"),
     icon: item.favicon || buildFaviconUrl(item.url),
-    tag: `cooldown-${item.id}-${Date.now()}`,
+    tag: `cooldown-${item.id}-${item.endAt}`,
   });
 
   window.setTimeout(() => {

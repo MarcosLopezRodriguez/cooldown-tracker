@@ -61,7 +61,7 @@ try {
   }`);
   console.log(`Chrome real: ${discovered.browser}; perfil aislado: ${profile}`);
   const config = { extensionUrl: discovered.extensionUrl };
-  for (const file of ["web", "extension", "suspension"]) {
+  for (const file of ["web", "web-improvements", "extension", "suspension"]) {
     const source = await readFile(path.join(root, "tests", "browser", `${file}.js`), "utf8");
     const result = await runCode(source, config);
     if (result.upload || result.uploadValue) {

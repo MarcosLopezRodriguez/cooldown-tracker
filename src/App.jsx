@@ -10,6 +10,7 @@ import ImportPreview from "./components/ImportPreview.jsx";
 import { DEFAULT_SETTINGS, FILTER_OPTIONS, MAX_IMPORT_BYTES, SITE_MODES } from "./lib/constants.js";
 import {
   buildExportPayload,
+  applyDurationEdit,
   clearCooldown,
   getVisibleSites,
   parseImportPayload,
@@ -37,6 +38,7 @@ import { I18nProvider } from "./i18n/I18nContext.jsx";
 import { useI18n } from "./i18n/context.js";
 import { findMatchingRule } from "../extension/lib/rules.js";
 import { mergeSiteEdit } from "../extension/lib/operations.js";
+import { createWebCompletionLedger } from "./lib/web-completions.js";
 
 export default function CooldownApp() {
   const [initialNow] = useState(() => Date.now());
@@ -71,7 +73,7 @@ export default function CooldownApp() {
     push,
     t,
   });
-  const notifiedRef = useRef(new Set());
+  const [claimCompletion] = useState(() => createWebCompletionLedger());
   const itemsRef = useRef(items);
   const settingsRef = useRef(settings);
   const tRef = useRef(t);
@@ -200,19 +202,17 @@ export default function CooldownApp() {
 
       setItems(nextItems);
       completed.forEach((item) => {
-        const key = `${item.id}:${item.endAt}`;
-        if (notifiedRef.current.has(key)) {
+        if (!claimCompletion(item)) {
           return;
         }
 
-        notifiedRef.current.add(key);
         if (!extensionMode || settingsRef.current.privacyAccepted) notifyReady(item);
         push(t("readyToast", { name: item.label || hostnameFromUrl(item.url) }), "success");
       });
     }, 1000);
 
     return () => window.clearInterval(timerId);
-  }, [extensionMode, notifyReady, pendingImport, push, settings.privacyAccepted, storageReady, t]);
+  }, [claimCompletion, extensionMode, notifyReady, pendingImport, push, settings.privacyAccepted, storageReady, t]);
 
   useEffect(() => {
     const state = { items, settings };
@@ -306,7 +306,7 @@ export default function CooldownApp() {
     const existing = items.find((item) => item.id === payload.id) || editing;
     const isEditing = Boolean(existing);
 
-    if (existing && existing.mode !== SITE_MODES.ALWAYS && existing.endAt && payload.durationMs !== existing.durationMs) {
+    if (existing && existing.mode !== SITE_MODES.ALWAYS && payload.mode !== SITE_MODES.ALWAYS && existing.endAt > Date.now() && payload.durationMs !== existing.durationMs) {
       setDurationDecision({ payload, existing });
       closeForm();
       return;
@@ -354,15 +354,12 @@ export default function CooldownApp() {
     }
 
     const { payload, existing } = durationDecision;
-    const nextPayload =
-      mode === "now"
-        ? {
-            ...payload,
-            endAt: existing.lastVisitedAt ? existing.lastVisitedAt + payload.durationMs : payload.endAt,
-          }
-        : payload;
-
-    commitItem(nextPayload, t("durationUpdated"));
+    try {
+      const latest = mergeSiteEdit(itemsRef.current, existing, payload);
+      commitItem(applyDurationEdit(itemsRef.current, existing, latest, mode), t("durationUpdated"));
+    } catch (error) {
+      push(t(error.message === "staleSite" ? "staleSite" : "saveError"), "error");
+    }
     setDurationDecision(null);
   };
 

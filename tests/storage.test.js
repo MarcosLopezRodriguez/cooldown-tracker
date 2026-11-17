@@ -5,6 +5,13 @@ import { LS_KEY, LS_SETTINGS_KEY } from "../src/lib/constants.js";
 
 afterEach(() => { discardPendingRecovery(); delete globalThis.window; delete globalThis.chrome; delete globalThis.location; });
 const original = { id: "original", url: "https://example.com/", durationMs: 60_000 };
+test("sin window: lectura con valores iniciales y guardado no disponible", async () => {
+  delete globalThis.window;
+  const state = await loadStoredState();
+  assert.deepEqual(state.items, []);
+  assert.equal(state.settings.privacyAccepted, false);
+  assert.equal(await saveStoredState(state), false);
+});
 function web(items = [original], settings = { language: "es" }) {
   const data = new Map([[LS_KEY, JSON.stringify(items)], [LS_SETTINGS_KEY, JSON.stringify(settings)]]);
   const writes = [];

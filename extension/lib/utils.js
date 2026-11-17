@@ -66,7 +66,8 @@ export function buildFaviconUrl(value) {
     return null;
   }
 
-  const pageUrl = value.includes("://") ? value : `https://${value}`;
+  const pageUrl = normalizeUrl(value);
+  if (!pageUrl) return null;
   if (isExtensionContext() && globalThis.chrome?.runtime?.getURL) {
     const faviconUrl = new URL(globalThis.chrome.runtime.getURL("/_favicon/"));
     faviconUrl.searchParams.set("pageUrl", pageUrl);

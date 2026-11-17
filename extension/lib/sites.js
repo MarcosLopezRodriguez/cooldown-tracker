@@ -257,6 +257,17 @@ export function upsertSite(items, draft, now = Date.now()) {
   return items.map((item) => (item.id === normalizedDraft.id ? normalizedDraft : item));
 }
 
+export function applyDurationEdit(items, original, draft, mode, now = Date.now()) {
+  const current = items.find(item => item.id === original.id);
+  if (!current) throw new Error("staleSite");
+  const next = { ...current, ...draft, endAt: current.endAt, lastVisitedAt: current.lastVisitedAt };
+  if (mode === "now" && current.endAt > now && next.mode !== SITE_MODES.ALWAYS) {
+    const start = current.lastVisitedAt ?? (current.endAt - current.durationMs);
+    next.endAt = start + next.durationMs;
+  }
+  return next;
+}
+
 export function removeSite(items, id) {
   return items.filter((item) => item.id !== id);
 }
